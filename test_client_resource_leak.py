@@ -2,6 +2,9 @@ import asyncio
 import threading
 import tempfile
 import os
+os.environ.setdefault("API_ID", "12345")
+os.environ.setdefault("API_HASH", "0123456789abcdef0123456789abcdef")
+os.environ.setdefault("BOT_TOKEN", "12345:abcdefghijklmnopqrstuvwxyz0123456789abcdef")
 import unittest
 from session_core import make_pyro_client
 from config import safe_pyrogram_disconnect

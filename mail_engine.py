@@ -1,5 +1,5 @@
 # ==============================================================================
-# AccStore Session Manager — Mail Engine
+# Onyx Session Manager — Mail Engine
 # ==============================================================================
 # Provides:
 #   1. PermutationGenerator — Case + Gmail dot multiplexer
@@ -22,6 +22,7 @@ import random
 import re
 import string
 import time
+import threading
 import urllib.request
 import urllib.error
 
@@ -29,6 +30,10 @@ try:
     from proxy_manager import proxy_pool
 except ImportError:
     proxy_pool = None
+
+# Bound concurrent blocking IMAP/HTTP work across all users, while keeping I/O off the event loop.
+_MAIL_HTTP_LIMITER = threading.BoundedSemaphore(8)
+_IMAP_CONNECT_LIMITER = threading.BoundedSemaphore(6)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 1: EMAIL PERMUTATION GENERATOR
@@ -267,6 +272,7 @@ class TempMailClient:
     CODE_REGEX = re.compile(r"\b(\d{5,6})\b")
     
     _mailtm_cooldown_until = 0
+    _tempmail_plus_cooldown_until = 0
     
     def __init__(self):
         self._active_email = None
@@ -277,7 +283,7 @@ class TempMailClient:
     
     def _http_request(self, url, data=None, headers=None, method=None):
         """Synchronous HTTP request helper."""
-        hdrs = {"User-Agent": "Mozilla/5.0 (AccStore/1.0)", "Content-Type": "application/json"}
+        hdrs = {"User-Agent": "Mozilla/5.0 (Onyx/1.0)", "Content-Type": "application/json"}
         if headers:
             hdrs.update(headers)
         
@@ -286,11 +292,24 @@ class TempMailClient:
         
         req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                body = resp.read().decode("utf-8")
-                return json.loads(body) if body.strip() else {}
+            with _MAIL_HTTP_LIMITER:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    body = resp.read().decode("utf-8")
+                    return json.loads(body) if body.strip() else {}
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")
+            if e.code == 429 and ("api.mail.tm" in url or "tempmail.plus" in url):
+                is_mailtm = "api.mail.tm" in url
+                default_wait = "600" if is_mailtm else "60"
+                try:
+                    retry_after = int(e.headers.get("Retry-After", default_wait))
+                except (TypeError, ValueError):
+                    retry_after = int(default_wait)
+                wait = min(max(retry_after, 10), 600 if is_mailtm else 300)
+                if is_mailtm:
+                    TempMailClient._mailtm_cooldown_until = max(TempMailClient._mailtm_cooldown_until, time.time() + wait)
+                else:
+                    TempMailClient._tempmail_plus_cooldown_until = max(TempMailClient._tempmail_plus_cooldown_until, time.time() + wait)
             logging.warning(f"[TEMPMAIL] HTTP {e.code} from {url}: {body[:200]}")
             raise
         except Exception as e:
@@ -337,7 +356,7 @@ class TempMailClient:
                 domain = random.choice(valid_mailtm)
                 username = "tg_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
                 email_addr = f"{username}@{domain}"
-                password = "AccStore_" + "".join(random.choices(string.ascii_letters + string.digits, k=14))
+                password = "Onyx_" + "".join(random.choices(string.ascii_letters + string.digits, k=14))
                 
                 try:
                     # Create account
@@ -381,8 +400,8 @@ class TempMailClient:
                     return email_addr
                 except urllib.error.HTTPError as e:
                     if e.code == 429:
-                        TempMailClient._mailtm_cooldown_until = time.time() + 600
-                        logging.warning(f"[TEMPMAIL] Mail.tm 429 rate limit hit. 10m cooldown active, failing over to Tempmail.plus.")
+                        # _http_request already applied Telegram/HTTP Retry-After to the shared cooldown.
+                        logging.warning("[TEMPMAIL] Mail.tm 429 rate limit hit; failing over to Tempmail.plus.")
                     else:
                         logging.warning(f"[TEMPMAIL] Mail.tm creation failed: {e}")
                 except Exception as e:
@@ -415,6 +434,16 @@ class TempMailClient:
         start = time.time()
         
         while time.time() - start < timeout:
+            cooldown_until = (
+                TempMailClient._mailtm_cooldown_until if self._provider == "mailtm" else
+                TempMailClient._tempmail_plus_cooldown_until if self._provider == "tempmail_plus" else 0
+            )
+            if time.time() < cooldown_until:
+                remaining = timeout - (time.time() - start)
+                wait_for = min(remaining, cooldown_until - time.time())
+                if wait_for > 0:
+                    await asyncio.sleep(wait_for)
+                continue
             try:
                 code = await self._check_inbox(target, expected_length=expected_length)
                 if code:
@@ -628,8 +657,9 @@ class IMAPMailClient:
         """Establish IMAP SSL connection directly via VPS first (fast & reliable), falling back to proxy pool if needed."""
         # 1. Connect directly first (fastest, avoids proxy delays or 407 proxy auth blocks)
         try:
-            conn = imaplib.IMAP4_SSL(self.imap_host, self.imap_port, timeout=12)
-            conn.login(self.email_address, self.app_password)
+            with _IMAP_CONNECT_LIMITER:
+                conn = imaplib.IMAP4_SSL(self.imap_host, self.imap_port, timeout=12)
+                conn.login(self.email_address, self.app_password)
             return conn
         except imaplib.IMAP4.error as e:
             # Login error from the server directly (wrong app password or IMAP disabled)
@@ -643,14 +673,15 @@ class IMAPMailClient:
             logging.info(f"[IMAP] Direct connection failed for {self.email_address} on {self.imap_host}: {direct_err}. Attempting proxy pool failover...")
             if proxy_pool and proxy_pool.total_count > 0:
                 try:
-                    conn = proxy_pool.connect_imap(
-                        self.imap_host,
-                        self.imap_port,
-                        session_key=self.email_address,
-                        timeout=15,
-                        max_retries=3,
-                    )
-                    conn.login(self.email_address, self.app_password)
+                    with _IMAP_CONNECT_LIMITER:
+                        conn = proxy_pool.connect_imap(
+                            self.imap_host,
+                            self.imap_port,
+                            session_key=self.email_address,
+                            timeout=15,
+                            max_retries=3,
+                        )
+                        conn.login(self.email_address, self.app_password)
                     return conn
                 except imaplib.IMAP4.error as e:
                     raise ConnectionError(

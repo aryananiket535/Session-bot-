@@ -1,4 +1,9 @@
+import os
+os.environ.setdefault("API_ID", "12345")
+os.environ.setdefault("API_HASH", "0123456789abcdef0123456789abcdef")
+os.environ.setdefault("BOT_TOKEN", "12345:abcdefghijklmnopqrstuvwxyz0123456789abcdef")
 import asyncio
+import unittest
 try:
     import pytest
 except ImportError:
@@ -98,3 +103,10 @@ if __name__ == "__main__":
     print("Running test_tele_client_releases_sem_on_cancellation...")
     test_tele_client_releases_sem_on_cancellation()
     print("✅ ALL CONCURRENCY TESTS PASSED!")
+
+
+class TestConcurrencySafetyFunctions(unittest.TestCase):
+    def test_pack_locking(self): test_pack_locking_prevents_duplicate_runs()
+    def test_telethon_disconnect_releases_semaphore(self): test_safe_telethon_disconnect_releases_sem_even_if_not_connected()
+    def test_pyrogram_cancellation_releases_semaphore(self): test_pyro_client_releases_sem_on_cancellation()
+    def test_telethon_cancellation_releases_semaphore(self): test_tele_client_releases_sem_on_cancellation()

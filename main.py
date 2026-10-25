@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
 ╔═══════════════════════════════════════════════════════════════╗
-║         AccStore — Session Management Platform         ║
+║         Onyx — Session Management Platform         ║
 ╚═══════════════════════════════════════════════════════════════╝
 """
 
 import asyncio
 import os
 import sqlite3
+import time
 
 # Optimize file descriptor limit for 500+ concurrent user sessions
 try:
@@ -52,16 +53,13 @@ async def start_web_server():
     try:
         server = await asyncio.start_server(
             handle_health_check, '0.0.0.0', port,
-            reuse_address=True, reuse_port=True
+            reuse_address=True
         )
-    except OSError:
-        # Kill whatever is holding the port and retry
-        os.system(f"fuser -k {port}/tcp 2>/dev/null")
-        await asyncio.sleep(1)
-        server = await asyncio.start_server(
-            handle_health_check, '0.0.0.0', port,
-            reuse_address=True, reuse_port=True
-        )
+    except OSError as exc:
+        raise RuntimeError(
+            f"Health-check port {port} is already in use. Set PORT/SERVER_PORT to an unused port; "
+            "the bot will not terminate unrelated processes."
+        ) from exc
     print(f"🌐 Web health server started on 0.0.0.0:{port}")
     return server
 
@@ -69,9 +67,28 @@ if __name__ == "__main__":
     ensure_storage()
     try:
         _meta_startup = load_meta()
-        GLOBAL_ANNOUNCEMENT = _meta_startup.get("announcement", "")
-        MAINTENANCE_MODE = _meta_startup.get("maintenance", False)
-        WHITELIST_MODE = _meta_startup.get("whitelist", False)
+        config.GLOBAL_ANNOUNCEMENT = _meta_startup.get("announcement", "")
+        config.MAINTENANCE_MODE = bool(_meta_startup.get("maintenance", False))
+        config.WHITELIST_MODE = bool(_meta_startup.get("whitelist", False))
+        config.ACCESS_MODE = "paid" if str(_meta_startup.get("access_mode", "free")).lower() == "paid" else "free"
+        config.SUDO_USERS.clear()
+        _sudo_users = _meta_startup.get("sudo_users", {})
+        if isinstance(_sudo_users, dict):
+            for _uid, _expiry in _sudo_users.items():
+                try:
+                    _expiry = float(_expiry.get("expires_at") if isinstance(_expiry, dict) else _expiry)
+                    if str(_uid).isdigit() and _expiry > time.time():
+                        config.SUDO_USERS[str(_uid)] = _expiry
+                except (TypeError, ValueError):
+                    continue
+        config.WHITELISTED_USERS.clear()
+        config.WHITELISTED_USERS.update(int(x) for x in _meta_startup.get("whitelisted_users", []) if str(x).lstrip("-").isdigit())
+        config.BANNED_USERS.clear()
+        config.BANNED_USERS.update(int(x) for x in _meta_startup.get("banned_users", []) if str(x).lstrip("-").isdigit())
+        config.FORCE_JOIN_CHATS.clear()
+        _force_chats = _meta_startup.get("force_join_chats", {})
+        if isinstance(_force_chats, dict):
+            config.FORCE_JOIN_CHATS.update(_force_chats)
         for _adm in _meta_startup.get("admins", []):
             if _adm not in ADMIN_IDS:
                 ADMIN_IDS.append(_adm)

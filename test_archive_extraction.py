@@ -1,5 +1,9 @@
 import asyncio
+import unittest
 import os
+os.environ.setdefault("API_ID", "12345")
+os.environ.setdefault("API_HASH", "0123456789abcdef0123456789abcdef")
+os.environ.setdefault("BOT_TOKEN", "12345:abcdefghijklmnopqrstuvwxyz0123456789abcdef")
 import shutil
 import tempfile
 import sqlite3
@@ -175,3 +179,12 @@ def test_txt_session_inside_archive():
         assert len(files) == 1
     finally:
         shutil.rmtree(td, ignore_errors=True)
+
+
+class TestArchiveExtractionFunctions(unittest.TestCase):
+    def test_standard_zip_extraction(self): test_standard_zip_extraction()
+    def test_nested_zip_extraction(self): test_nested_zip_extraction()
+    def test_tar_archive_extraction(self): test_tar_archive_extraction()
+    def test_sqlite_without_session_extension(self): test_sqlite_without_session_extension()
+    def test_json_int_list_auth_key_extraction(self): test_json_int_list_auth_key_extraction()
+    def test_txt_session_inside_archive(self): test_txt_session_inside_archive()

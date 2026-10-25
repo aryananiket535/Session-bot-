@@ -1,11 +1,12 @@
 # ==============================================================================
-# AccStore Session Manager — Session Engine, Storage, Clients & Formats
+# Onyx Session Manager — Session Engine, Storage, Clients & Formats
 # ==============================================================================
 
 import config
 from config import *
 import subprocess
 import tarfile
+import threading
 from config import (
     _get_device_params_for_session,
     _PROXY_TYPE,
@@ -1659,7 +1660,7 @@ async def build_zip_from_sessions(session_paths, file_name, target_format="unive
                         "                   UNIVERSAL TELEGRAM SESSION PACK INSTRUCTIONS                  \n"
                         "================================================================================\n\n"
                         "This pack contains pristine sessions compatible with ALL external Telegram tools:\n\n"
-                        "1. FOR TELETHON BOTS (e.g. AccStore, Telegram Prime, Telegram Expert, custom scripts):\n"
+                        "1. FOR TELETHON BOTS (e.g. Onyx, Telegram Prime, Telegram Expert, custom scripts):\n"
                         "   - Use the .session and .json files inside the 'telethon/' folder.\n"
                         "   - Or use the '*_telethon.session' files in the root folder.\n\n"
                         "2. FOR PYROGRAM BOTS (e.g. Kurigram, Hydrogram, Pyrogram v1/v2 bots & userbots):\n"
@@ -1784,6 +1785,30 @@ async def convert_telethon_to_pyro_file(tele_path, output_folder):
 
 
 
+MAX_ARCHIVE_MEMBERS = int(os.getenv("MAX_ARCHIVE_MEMBERS", "10000"))
+MAX_ARCHIVE_MEMBER_BYTES = int(os.getenv("MAX_ARCHIVE_MEMBER_BYTES", str(128 * 1024 * 1024)))
+MAX_ARCHIVE_EXPANDED_BYTES = int(os.getenv("MAX_ARCHIVE_EXPANDED_BYTES", str(512 * 1024 * 1024)))
+_ARCHIVE_EXTRACTION_LIMITER = threading.BoundedSemaphore(2)
+
+
+def _limited_safe_extract_archive(archive_path, dest_dir):
+    with _ARCHIVE_EXTRACTION_LIMITER:
+        return safe_extract_archive(archive_path, dest_dir)
+
+
+def _archive_tree_size(path, limit=MAX_ARCHIVE_EXPANDED_BYTES):
+    total = 0
+    for root, _, files in os.walk(path):
+        for name in files:
+            try:
+                total += os.path.getsize(os.path.join(root, name))
+            except OSError:
+                continue
+            if total > limit:
+                return total
+    return total
+
+
 def safe_extract_archive(archive_path, dest_dir):
     """
     Resilient multi-tier archive extractor (ZIP, RAR, 7Z, TAR, GZ, BZ2, XZ, etc.)
@@ -1791,6 +1816,13 @@ def safe_extract_archive(archive_path, dest_dir):
     Secures against Zip Slip directory traversal attacks.
     """
     os.makedirs(dest_dir, exist_ok=True)
+    dest_root = os.path.abspath(dest_dir)
+    try:
+        if os.path.getsize(archive_path) > MAX_ARCHIVE_EXPANDED_BYTES:
+            logging.warning("[safe_extract_archive] Archive exceeds configured compressed-size limit")
+            return False
+    except OSError:
+        return False
     extracted = False
     lower_path = archive_path.lower()
 
@@ -1798,7 +1830,12 @@ def safe_extract_archive(archive_path, dest_dir):
     if lower_path.endswith(".zip"):
         try:
             with zipfile.ZipFile(archive_path, "r") as zf:
-                for member in zf.infolist():
+                members = zf.infolist()
+                expanded = sum(max(0, member.file_size) for member in members)
+                if len(members) > MAX_ARCHIVE_MEMBERS or expanded > MAX_ARCHIVE_EXPANDED_BYTES or any(m.file_size > MAX_ARCHIVE_MEMBER_BYTES for m in members):
+                    logging.warning("[safe_extract_archive] ZIP exceeds configured member/count/expanded-size limits")
+                    return False
+                for member in members:
                     filename = member.filename
                     if not (member.flag_bits & 0x800):
                         try:
@@ -1806,7 +1843,7 @@ def safe_extract_archive(archive_path, dest_dir):
                         except Exception:
                             filename = member.filename
                     target_path = os.path.abspath(os.path.join(dest_dir, filename))
-                    if os.path.commonpath([dest_dir, target_path]) == dest_dir:
+                    if os.path.commonpath([dest_root, target_path]) == dest_root:
                         if member.is_dir():
                             os.makedirs(target_path, exist_ok=True)
                         else:
@@ -1824,9 +1861,14 @@ def safe_extract_archive(archive_path, dest_dir):
     ):
         try:
             with tarfile.open(archive_path, "r:*") as tf:
-                for member in tf.getmembers():
+                members = tf.getmembers()
+                expanded = sum(max(0, member.size) for member in members if member.isfile())
+                if len(members) > MAX_ARCHIVE_MEMBERS or expanded > MAX_ARCHIVE_EXPANDED_BYTES or any(member.isfile() and member.size > MAX_ARCHIVE_MEMBER_BYTES for member in members):
+                    logging.warning("[safe_extract_archive] TAR exceeds configured member/count/expanded-size limits")
+                    return False
+                for member in members:
                     target_path = os.path.abspath(os.path.join(dest_dir, member.name))
-                    if os.path.commonpath([dest_dir, target_path]) == dest_dir:
+                    if os.path.commonpath([dest_root, target_path]) == dest_root:
                         if member.isdir():
                             os.makedirs(target_path, exist_ok=True)
                         elif member.isfile():
@@ -1846,8 +1888,11 @@ def safe_extract_archive(archive_path, dest_dir):
                 stderr=subprocess.PIPE,
                 timeout=90
             )
-            if proc.returncode in (0, 1):
+            if proc.returncode in (0, 1) and _archive_tree_size(dest_root) <= MAX_ARCHIVE_EXPANDED_BYTES:
                 extracted = True
+            elif proc.returncode in (0, 1):
+                shutil.rmtree(dest_root, ignore_errors=True)
+                os.makedirs(dest_root, exist_ok=True)
         except Exception as e:
             logging.info(f"[safe_extract_archive] 7z error on {archive_path}: {e}")
 
@@ -1860,8 +1905,11 @@ def safe_extract_archive(archive_path, dest_dir):
                 stderr=subprocess.PIPE,
                 timeout=90
             )
-            if proc.returncode == 0:
+            if proc.returncode == 0 and _archive_tree_size(dest_root) <= MAX_ARCHIVE_EXPANDED_BYTES:
                 extracted = True
+            elif proc.returncode == 0:
+                shutil.rmtree(dest_root, ignore_errors=True)
+                os.makedirs(dest_root, exist_ok=True)
         except Exception as e:
             logging.info(f"[safe_extract_archive] unrar error on {archive_path}: {e}")
 
@@ -1874,8 +1922,11 @@ def safe_extract_archive(archive_path, dest_dir):
                 stderr=subprocess.PIPE,
                 timeout=90
             )
-            if proc.returncode in (0, 1):
+            if proc.returncode in (0, 1) and _archive_tree_size(dest_root) <= MAX_ARCHIVE_EXPANDED_BYTES:
                 extracted = True
+            elif proc.returncode in (0, 1):
+                shutil.rmtree(dest_root, ignore_errors=True)
+                os.makedirs(dest_root, exist_ok=True)
         except Exception as e:
             logging.info(f"[safe_extract_archive] unzip error on {archive_path}: {e}")
 
@@ -1953,9 +2004,13 @@ async def extract_sessions_from_zip(source_zip_path, target_dir, clean=True):
 
     session_count = 0
     with tempfile.TemporaryDirectory(prefix="acs_ext_") as temp_extract_dir:
-        success = safe_extract_archive(source_zip_path, temp_extract_dir)
+        success = await asyncio.to_thread(_limited_safe_extract_archive, source_zip_path, temp_extract_dir)
         if not success:
             logging.warning(f"[extract_sessions_from_zip] Failed to extract archive: {source_zip_path}")
+            return 0
+        if _archive_tree_size(temp_extract_dir) > MAX_ARCHIVE_EXPANDED_BYTES:
+            logging.warning("[extract_sessions_from_zip] Extracted archive exceeded total size limit")
+            return 0
 
         # Recursively unpack any nested archives within temp_extract_dir (up to 3 levels)
         nested_exts = (".zip", ".rar", ".7z", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz", ".gz", ".bz2", ".xz")
@@ -1971,8 +2026,11 @@ async def extract_sessions_from_zip(source_zip_path, target_dir, clean=True):
                         sub_dest = os.path.join(root, f"_nested_{file}")
                         if not os.path.exists(sub_dest):
                             os.makedirs(sub_dest, exist_ok=True)
-                            if safe_extract_archive(sub_archive, sub_dest):
+                            if await asyncio.to_thread(_limited_safe_extract_archive, sub_archive, sub_dest):
                                 found_nested = True
+                                if _archive_tree_size(temp_extract_dir) > MAX_ARCHIVE_EXPANDED_BYTES:
+                                    logging.warning("[extract_sessions_from_zip] Nested archives exceeded total size limit")
+                                    return 0
                                 try:
                                     os.remove(sub_archive)
                                 except Exception:
@@ -2170,28 +2228,27 @@ extract_sessions_from_archive = extract_sessions_from_zip
 def start_keyboard(user_id=None):
     rows = [
         [
-            InlineKeyboardButton("➕ Create Session (Telethon)", callback_data="create|telethon"),
-            InlineKeyboardButton("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
+            styled_button("➕ Create Session (Telethon)", callback_data="create|telethon"),
+            styled_button("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
         ],
         [
-            InlineKeyboardButton("🔑 Input String / Hex Key", callback_data="start_logout"),
-            InlineKeyboardButton("📧 Mail Settings", callback_data="mail_settings_open"),
+            styled_button("🔑 Input String / Hex Key", callback_data="start_logout"),
+            styled_button("📧 Mail Settings", callback_data="mail_settings_open"),
         ],
     ]
-    if user_id and is_admin(user_id):
-        rows.append([InlineKeyboardButton("📦 My Packs", callback_data="user_packs:0")])
-        rows.append([InlineKeyboardButton("👑 Admin Panel", callback_data="admin_panel_open")])
+    if user_id:
+        rows.append([styled_button("📦 My Packs", callback_data="user_packs:0")])
+        if is_admin(user_id):
+            rows.append([styled_button("👑 Admin Panel", callback_data="admin_panel_open")])
     extra_row = []
     if CHANNEL_LINK:
-        extra_row.append(InlineKeyboardButton("📢 Channel", url=CHANNEL_LINK))
+        extra_row.append(styled_button("📢 Channel", url=CHANNEL_LINK))
     if SUPPORT_LINK:
-        extra_row.append(InlineKeyboardButton("💬 Support", url=SUPPORT_LINK))
+        extra_row.append(styled_button("💬 Support", url=SUPPORT_LINK))
     if extra_row:
         rows.append(extra_row)
     return InlineKeyboardMarkup(rows)
 
-
-GLOBAL_ANNOUNCEMENT = ""
 
 def start_menu_text():
     """Build the /start welcome message."""
@@ -2204,7 +2261,7 @@ def start_menu_text():
             proxy_line = " ├ 🌐 Network: `Direct VPS Connection`\n"
     except Exception:
         proxy_line = ""
-    announcement_block = f"📢 **Announcement:**\n{GLOBAL_ANNOUNCEMENT}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" if GLOBAL_ANNOUNCEMENT else ""
+    announcement_block = f"📢 **Announcement:**\n{config.GLOBAL_ANNOUNCEMENT}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" if config.GLOBAL_ANNOUNCEMENT else ""
     return (
         f"⚡ **{PLATFORM_NAME}** — Premium Session Control\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -2229,14 +2286,14 @@ def devices_keyboard(zip_id):
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📋 Show Devices", callback_data=f"dev|list|{zip_id}"),
-                InlineKeyboardButton("🗑 Revoke Devices", callback_data=f"dev|confirm_remove|{zip_id}"),
+                styled_button("📋 Show Devices", callback_data=f"dev|list|{zip_id}"),
+                styled_button("🗑 Revoke Devices", callback_data=f"dev|confirm_remove|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("🛡 Whitelist Device", callback_data=f"dev|protect|{zip_id}"),
-                InlineKeyboardButton("📊 Sort by Devices", callback_data=f"dev|sort|{zip_id}"),
+                styled_button("🛡 Whitelist Device", callback_data=f"dev|protect|{zip_id}"),
+                styled_button("📊 Sort by Devices", callback_data=f"dev|sort|{zip_id}"),
             ],
-            [InlineKeyboardButton("🔙 Return", callback_data=f"dev|back|{zip_id}")],
+            [styled_button("🔙 Return", callback_data=f"dev|back|{zip_id}")],
         ]
     )
 
@@ -2254,74 +2311,74 @@ def operations_keyboard(zip_id):
     rows = []
     
     if is_direct:
-        rows.append([InlineKeyboardButton("📱 Devices Dashboard", callback_data=f"zip|direct_devices_dash|{zip_id}")])
+        rows.append([styled_button("📱 Devices Dashboard", callback_data=f"zip|direct_devices_dash|{zip_id}")])
 
     rows.append([
-        InlineKeyboardButton("✅ Verify", callback_data=f"zip|check_sessions|{zip_id}"),
-        InlineKeyboardButton("🚫 Spam Scan", callback_data=f"zip|check_spam|{zip_id}"),
+        styled_button("✅ Verify", callback_data=f"zip|check_sessions|{zip_id}"),
+        styled_button("🚫 Spam Scan", callback_data=f"zip|check_spam|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("📅 Check Age", callback_data=f"zip|check_age|{zip_id}"),
-        InlineKeyboardButton("📧 Check Mail", callback_data=f"zip|check_mail|{zip_id}"),
+        styled_button("📅 Check Age", callback_data=f"zip|check_age|{zip_id}"),
+        styled_button("📧 Check Mail", callback_data=f"zip|check_mail|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("✉️ Bind Mail (1-by-1)", callback_data=f"zip|bind_mail|{zip_id}"),
-        InlineKeyboardButton("🌟 Check All", callback_data=f"zip|check_all|{zip_id}"),
+        styled_button("✉️ Bind Mail (1-by-1)", callback_data=f"zip|bind_mail|{zip_id}"),
+        styled_button("🌟 Check All", callback_data=f"zip|check_all|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("🌐 DC Info", callback_data=f"zip|dc_info|{zip_id}"),
-        InlineKeyboardButton("🔐 TwoFA", callback_data=f"zip|twofa|{zip_id}"),
+        styled_button("🌐 DC Info", callback_data=f"zip|dc_info|{zip_id}"),
+        styled_button("🔐 TwoFA", callback_data=f"zip|twofa|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("📱 Devices", callback_data=f"zip|devices|{zip_id}"),
-        InlineKeyboardButton("🔑 Fetch OTP", callback_data=f"zip|read_otp|{zip_id}"),
+        styled_button("📱 Devices", callback_data=f"zip|devices|{zip_id}"),
+        styled_button("🔑 Fetch OTP", callback_data=f"zip|read_otp|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("👁️ Mark Read", callback_data=f"zip|mark_read|{zip_id}"),
-        InlineKeyboardButton("🧹 Clean Accounts", callback_data=f"zip|clean_menu|{zip_id}"),
+        styled_button("👁️ Mark Read", callback_data=f"zip|mark_read|{zip_id}"),
+        styled_button("🧹 Clean Accounts", callback_data=f"zip|clean_menu|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("🏷 Set Name", callback_data=f"zip|change_name|{zip_id}"),
-        InlineKeyboardButton("📝 Set Bio", callback_data=f"zip|change_bio|{zip_id}"),
+        styled_button("🏷 Set Name", callback_data=f"zip|change_name|{zip_id}"),
+        styled_button("📝 Set Bio", callback_data=f"zip|change_bio|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("👤 Username", callback_data=f"zip|change_username|{zip_id}"),
-        InlineKeyboardButton("🖼 Change Pic", callback_data=f"zip|change_avatar|{zip_id}"),
+        styled_button("👤 Username", callback_data=f"zip|change_username|{zip_id}"),
+        styled_button("🖼 Change Pic", callback_data=f"zip|change_avatar|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("🗑 Delete Pics", callback_data=f"zip|confirm_delete_avatar|{zip_id}"),
-        InlineKeyboardButton("💀 Terminate Bot", callback_data=f"zip|confirm_destroy|{zip_id}"),
+        styled_button("🗑 Delete Pics", callback_data=f"zip|confirm_delete_avatar|{zip_id}"),
+        styled_button("💀 Terminate Bot", callback_data=f"zip|confirm_destroy|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("🌍 Community Actions", callback_data=f"zip|comm_menu|{zip_id}")
+        styled_button("🌍 Community Actions", callback_data=f"zip|comm_menu|{zip_id}")
     ])
     
     if not is_direct:
         rows.append([
-            InlineKeyboardButton("🆕 Fresh", callback_data=f"zip|new_sessions|{zip_id}"),
-            InlineKeyboardButton("✏️ Rename", callback_data=f"zip|rename|{zip_id}"),
+            styled_button("🆕 Fresh", callback_data=f"zip|new_sessions|{zip_id}"),
+            styled_button("✏️ Rename", callback_data=f"zip|rename|{zip_id}"),
         ])
         rows.append([
-            InlineKeyboardButton("✂️ Split", callback_data=f"zip|split|{zip_id}"),
-            InlineKeyboardButton("📎 Combine", callback_data=f"zip|merge|{zip_id}"),
+            styled_button("✂️ Split", callback_data=f"zip|split|{zip_id}"),
+            styled_button("📎 Combine", callback_data=f"zip|merge|{zip_id}"),
         ])
     
     if current_format == "PYROGRAM":
-        rows.append([InlineKeyboardButton("🔄 Convert to Telethon", callback_data=f"zip|convert_format|{zip_id}")])
+        rows.append([styled_button("🔄 Convert to Telethon", callback_data=f"zip|convert_format|{zip_id}")])
     elif current_format == "TELETHON":
-        rows.append([InlineKeyboardButton("🔄 Convert to Pyrogram", callback_data=f"zip|convert_to_pyro|{zip_id}")])
+        rows.append([styled_button("🔄 Convert to Pyrogram", callback_data=f"zip|convert_to_pyro|{zip_id}")])
     else:
         rows.append([
-            InlineKeyboardButton("🔄 To Telethon", callback_data=f"zip|convert_format|{zip_id}"),
-            InlineKeyboardButton("🔄 To Pyrogram", callback_data=f"zip|convert_to_pyro|{zip_id}")
+            styled_button("🔄 To Telethon", callback_data=f"zip|convert_format|{zip_id}"),
+            styled_button("🔄 To Pyrogram", callback_data=f"zip|convert_to_pyro|{zip_id}")
         ])
 
     rows.append([
-        InlineKeyboardButton("📊 Info", callback_data=f"zip|info|{zip_id}"),
-        InlineKeyboardButton("📥 Download & Export", callback_data=f"zip|download|{zip_id}"),
+        styled_button("📊 Info", callback_data=f"zip|info|{zip_id}"),
+        styled_button("📥 Download & Export", callback_data=f"zip|download|{zip_id}"),
     ])
     rows.append([
-        InlineKeyboardButton("📋 Export Strings / Hex", callback_data=f"zip|export_menu|{zip_id}"),
+        styled_button("📋 Export Strings / Hex", callback_data=f"zip|export_menu|{zip_id}"),
     ])
     
     return InlineKeyboardMarkup(rows)
@@ -2332,18 +2389,18 @@ def operations_keyboard(zip_id):
 def new_session_format_keyboard(zip_id):
     return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("📲 As Telethon", callback_data=f"shift|telethon|{zip_id}")],
-            [InlineKeyboardButton("📲 As Pyrogram", callback_data=f"shift|pyrogram|{zip_id}")],
-            [InlineKeyboardButton("🔙 Return", callback_data=f"shift|back|{zip_id}")],
+            [styled_button("📲 As Telethon", callback_data=f"shift|telethon|{zip_id}")],
+            [styled_button("📲 As Pyrogram", callback_data=f"shift|pyrogram|{zip_id}")],
+            [styled_button("🔙 Return", callback_data=f"shift|back|{zip_id}")],
         ]
     )
 
 def split_options_keyboard(zip_id):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🌍 Split by Country", callback_data=f"zip|split_country|{zip_id}")],
-        [InlineKeyboardButton("🔢 Split by Quantity", callback_data=f"zip|split_quantity|{zip_id}")],
-        [InlineKeyboardButton("🚫 Split by Spam", callback_data=f"zip|split_spam|{zip_id}")],
-        [InlineKeyboardButton("🔙 Return", callback_data=f"zip|open|{zip_id}")]
+        [styled_button("🌍 Split by Country", callback_data=f"zip|split_country|{zip_id}")],
+        [styled_button("🔢 Split by Quantity", callback_data=f"zip|split_quantity|{zip_id}")],
+        [styled_button("🚫 Split by Spam", callback_data=f"zip|split_spam|{zip_id}")],
+        [styled_button("🔙 Return", callback_data=f"zip|open|{zip_id}")]
     ])
 
 
@@ -2352,17 +2409,17 @@ def twofa_keyboard(zip_id):
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🔍 Check 2FA", callback_data=f"tfa|check|{zip_id}"),
+                styled_button("🔍 Check 2FA", callback_data=f"tfa|check|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("➕ Enable 2FA", callback_data=f"tfa|set|{zip_id}"),
-                InlineKeyboardButton("✏️ Change 2FA", callback_data=f"tfa|edit|{zip_id}"),
+                styled_button("➕ Enable 2FA", callback_data=f"tfa|set|{zip_id}"),
+                styled_button("✏️ Change 2FA", callback_data=f"tfa|edit|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("➖ Disable 2FA", callback_data=f"tfa|remove|{zip_id}"),
+                styled_button("➖ Disable 2FA", callback_data=f"tfa|remove|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("🔙 Return", callback_data=f"tfa|back|{zip_id}"),
+                styled_button("🔙 Return", callback_data=f"tfa|back|{zip_id}"),
             ],
         ]
     )
@@ -2374,14 +2431,14 @@ def mail_binding_keyboard(zip_id, has_self_mail: bool = False):
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🌐 Free Temp-Mail (Auto)", callback_data=f"mailbind|temp|{zip_id}"),
-                InlineKeyboardButton(self_label, callback_data=f"mailbind|self|{zip_id}"),
+                styled_button("🌐 Free Temp-Mail (Auto)", callback_data=f"mailbind|temp|{zip_id}"),
+                styled_button(self_label, callback_data=f"mailbind|self|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("⚙️ Configure Self-Mail", callback_data=f"mailbind|setup|{zip_id}"),
+                styled_button("⚙️ Configure Self-Mail", callback_data=f"mailbind|setup|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("🔙 Return to Pack", callback_data=f"mailbind|back|{zip_id}"),
+                styled_button("🔙 Return to Pack", callback_data=f"mailbind|back|{zip_id}"),
             ],
         ]
     )
@@ -2391,12 +2448,12 @@ def mail_binding_keyboard(zip_id, has_self_mail: bool = False):
 def mail_settings_keyboard(has_self_mail: bool = False):
     rows = []
     if has_self_mail:
-        rows.append([InlineKeyboardButton("🔄 Change Email / Password", callback_data="mail_setup_start")])
-        rows.append([InlineKeyboardButton("🧪 Test IMAP Connection", callback_data="mail_setup_test")])
-        rows.append([InlineKeyboardButton("🗑️ Remove My Mail Config", callback_data="mail_setup_delete")])
+        rows.append([styled_button("🔄 Change Email / Password", callback_data="mail_setup_start")])
+        rows.append([styled_button("🧪 Test IMAP Connection", callback_data="mail_setup_test")])
+        rows.append([styled_button("🗑️ Remove My Mail Config", callback_data="mail_setup_delete")])
     else:
-        rows.append([InlineKeyboardButton("➕ Setup Self-Mail (IMAP)", callback_data="mail_setup_start")])
-    rows.append([InlineKeyboardButton("🔙 Return to Main Menu", callback_data="mail_settings_back")])
+        rows.append([styled_button("➕ Setup Self-Mail (IMAP)", callback_data="mail_setup_start")])
+    rows.append([styled_button("🔙 Return to Main Menu", callback_data="mail_settings_back")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -2405,26 +2462,26 @@ def comm_ops_keyboard(zip_id):
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("➕ Join Chat", callback_data=f"comm|join|{zip_id}"),
-                InlineKeyboardButton("➖ Leave Chat", callback_data=f"comm|leave|{zip_id}"),
+                styled_button("➕ Join Chat", callback_data=f"comm|join|{zip_id}"),
+                styled_button("➖ Leave Chat", callback_data=f"comm|leave|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("📊 Vote Poll", callback_data=f"comm|vote|{zip_id}"),
-                InlineKeyboardButton("👥 Scrape Members", callback_data=f"comm|scrape|{zip_id}"),
+                styled_button("📊 Vote Poll", callback_data=f"comm|vote|{zip_id}"),
+                styled_button("👥 Scrape Members", callback_data=f"comm|scrape|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("👁 Increase Views", callback_data=f"comm|views|{zip_id}"),
-                InlineKeyboardButton("🎭 React to Post", callback_data=f"comm|react|{zip_id}"),
+                styled_button("👁 Increase Views", callback_data=f"comm|views|{zip_id}"),
+                styled_button("🎭 React to Post", callback_data=f"comm|react|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("💬 Send Message", callback_data=f"comm|send|{zip_id}"),
-                InlineKeyboardButton("🛡 Report Target", callback_data=f"comm|report|{zip_id}"),
+                styled_button("💬 Send Message", callback_data=f"comm|send|{zip_id}"),
+                styled_button("🛡 Report Target", callback_data=f"comm|report|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("📢 MASS BROADCAST 📢", callback_data=f"comm|broadcast_menu|{zip_id}"),
+                styled_button("📢 MASS BROADCAST 📢", callback_data=f"comm|broadcast_menu|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("🔙 Return to Menu", callback_data=f"comm|back|{zip_id}"),
+                styled_button("🔙 Return to Menu", callback_data=f"comm|back|{zip_id}"),
             ],
         ]
     )
@@ -2458,60 +2515,63 @@ def zip_menu_text(pack_id):
 def cancel_keyboard(kind):
     if kind == "create":
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Finish & Download Zip (/done)", callback_data="create_done")],
-            [InlineKeyboardButton("❌ Abort", callback_data="cancel|create")]
+            [styled_button("✅ Finish & Download Zip (/done)", callback_data="create_done")],
+            [styled_button("❌ Abort", callback_data="cancel|create")]
         ])
     return InlineKeyboardMarkup(
-        [[InlineKeyboardButton("❌ Abort", callback_data=f"cancel|{kind}")]]
+        [[styled_button("❌ Abort", callback_data=f"cancel|{kind}")]]
     )
 
 
 # Convert a session type string into a nice display name.
 # Example: "pyrogram" → "Pyrogram"
 def admin_keyboard():
-    maint_label = "🔴 Maintenance: ON" if MAINTENANCE_MODE else "🟢 Maintenance: OFF"
-    wl_label = "🔐 Whitelist: ON" if WHITELIST_MODE else "🔓 Whitelist: OFF"
+    maint_label = "🔴 Maintenance: ON" if config.MAINTENANCE_MODE else "🟢 Maintenance: OFF"
+    wl_label = "🔐 Whitelist: ON" if config.WHITELIST_MODE else "🔓 Whitelist: OFF"
     return InlineKeyboardMarkup([
         # User Management
-        [InlineKeyboardButton("👥 All Users", callback_data="admin_users:0"),
-         InlineKeyboardButton("🏆 Top Users", callback_data="admin_top_users")],
-        [InlineKeyboardButton("🔍 Lookup", callback_data="admin_lookup"),
-         InlineKeyboardButton("🛑 Kill Tasks", callback_data="admin_kill_tasks")],
-        [InlineKeyboardButton("🚫 Ban", callback_data="admin_ban"),
-         InlineKeyboardButton("✅ Unban", callback_data="admin_unban")],
+        [styled_button("👥 All Users", callback_data="admin_users:0"),
+         styled_button("🏆 Top Users", callback_data="admin_top_users")],
+        [styled_button("🔍 Lookup", callback_data="admin_lookup"),
+         styled_button("🛑 Kill Tasks", callback_data="admin_kill_tasks")],
+        [styled_button("🚫 Ban", callback_data="admin_ban"),
+         styled_button("✅ Unban", callback_data="admin_unban")],
         
         # Communication
-        [InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast"),
-         InlineKeyboardButton("💬 DM User", callback_data="admin_dm")],
-        [InlineKeyboardButton("📝 Set Announce", callback_data="admin_set_announce"),
-         InlineKeyboardButton("🔕 Clear Announce", callback_data="admin_clear_announce")],
+        [styled_button("📢 Broadcast", callback_data="admin_broadcast"),
+         styled_button("💬 DM User", callback_data="admin_dm")],
+        [styled_button("📝 Set Announce", callback_data="admin_set_announce"),
+         styled_button("🔕 Clear Announce", callback_data="admin_clear_announce")],
         
         # Pack Management
-        [InlineKeyboardButton("📦 All Packs", callback_data="admin_packs:0"),
-         InlineKeyboardButton("🔎 Search Pack", callback_data="admin_search_pack")],
-        [InlineKeyboardButton("💣 Delete Pack", callback_data="admin_del_pack"),
-         InlineKeyboardButton("🧹 Prune Packs", callback_data="admin_prune")],
+        [styled_button("📦 All Packs", callback_data="admin_packs:0"),
+         styled_button("🔎 Search Pack", callback_data="admin_search_pack")],
+        [styled_button("💣 Delete Pack", callback_data="admin_del_pack"),
+         styled_button("🧹 Prune Packs", callback_data="admin_prune")],
          
         # System & Monitoring
-        [InlineKeyboardButton("📊 Statistics", callback_data="admin_stats"),
-         InlineKeyboardButton("📋 Server Info", callback_data="admin_logs")],
-        [InlineKeyboardButton("💾 Disk Usage", callback_data="admin_disk"),
-         InlineKeyboardButton("🖥 VPS Specs", callback_data="admin_device")],
-        [InlineKeyboardButton("⚡ Active Tasks", callback_data="admin_active_tasks"),
-         InlineKeyboardButton("📝 Activity Log", callback_data="admin_activity")],
-        [InlineKeyboardButton("📥 Export Logs", callback_data="admin_export_logs"),
-         InlineKeyboardButton("📄 Export DB", callback_data="admin_export")],
-        [InlineKeyboardButton("📦 Full Backup", callback_data="admin_full_backup"),
-         InlineKeyboardButton("🔐 Mail Vault", callback_data="admin_mail_vault")],
+        [styled_button("📊 Statistics", callback_data="admin_stats"),
+         styled_button("📋 Server Info", callback_data="admin_logs")],
+        [styled_button("💾 Disk Usage", callback_data="admin_disk"),
+         styled_button("🖥 VPS Specs", callback_data="admin_device")],
+        [styled_button("⚡ Active Tasks", callback_data="admin_active_tasks"),
+         styled_button("📝 Activity Log", callback_data="admin_activity")],
+        [styled_button("📥 Export Logs", callback_data="admin_export_logs"),
+         styled_button("📄 Export DB", callback_data="admin_export")],
+        [styled_button("📦 Full Backup", callback_data="admin_full_backup"),
+         styled_button("🔐 Mail Vault", callback_data="admin_mail_vault")],
         
         # Access Control
-        [InlineKeyboardButton(maint_label, callback_data="admin_maint"),
-         InlineKeyboardButton(wl_label, callback_data="admin_whitelist")],
-        [InlineKeyboardButton("🗑️ Clear Cache", callback_data="admin_clear_cache")],
+        [styled_button(maint_label, callback_data="admin_maint"),
+         styled_button(wl_label, callback_data="admin_whitelist")],
+        [styled_button("🗑️ Clear Cache", callback_data="admin_clear_cache")],
+        [styled_button("👥 Manage Whitelist", callback_data="admin_whitelist_manage"),
+         styled_button("🔒 Force Join Chats", callback_data="admin_force_join")],
+        [styled_button("🔐 Accessibility Mode", callback_data="admin_accessibility")],
          
         # Admin Control
-        [InlineKeyboardButton("👑 Add Admin", callback_data="admin_addadmin"),
-         InlineKeyboardButton("🗑️ Remove Admin", callback_data="admin_deladmin")],
-        [InlineKeyboardButton("🔄 Restart Bot", callback_data="admin_restart")],
+        [styled_button("👑 Add Admin", callback_data="admin_addadmin"),
+         styled_button("🗑️ Remove Admin", callback_data="admin_deladmin")],
+        [styled_button("🔄 Restart Bot", callback_data="admin_restart")],
     ])
 

@@ -4,9 +4,13 @@
 
 import asyncio
 import os
+os.environ.setdefault("API_ID", "12345")
+os.environ.setdefault("API_HASH", "0123456789abcdef0123456789abcdef")
+os.environ.setdefault("BOT_TOKEN", "12345:abcdefghijklmnopqrstuvwxyz0123456789abcdef")
 import sys
 import tempfile
 import time
+import unittest
 
 import mail_engine
 import session_core
@@ -293,3 +297,12 @@ def main_test():
 
 if __name__ == "__main__":
     main_test()
+
+
+class TestMailSystemFunctions(unittest.TestCase):
+    def test_permutation_generator(self): test_permutation_generator()
+    def test_provider_detection(self): test_provider_detection()
+    def test_mail_vault_isolation(self): test_mail_vault_isolation()
+    def test_keyboards_and_ui(self): test_keyboards_and_ui()
+    def test_code_regex_and_extractors(self): test_code_regex_and_extractors()
+    def test_recipient_isolation(self): test_recipient_isolation()

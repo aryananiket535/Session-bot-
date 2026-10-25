@@ -1,5 +1,5 @@
 # ==============================================================================
-# AccStore Session Manager — Event Handlers, Callbacks & Commands
+# Onyx Session Manager — Event Handlers, Callbacks & Commands
 # ==============================================================================
 
 import config
@@ -87,10 +87,10 @@ async def start_handler(_, message):
             "💡 *Select an option below to proceed:*"
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⚙️ Open Self-Mail Vault", callback_data="mail_settings_open")],
-            [InlineKeyboardButton("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
-             InlineKeyboardButton("➕ Create Session (Telethon)", callback_data="create|telethon")],
-            [InlineKeyboardButton("🔙 Main Dashboard", callback_data="mail_settings_back")]
+            [styled_button("⚙️ Open Self-Mail Vault", callback_data="mail_settings_open")],
+            [styled_button("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
+             styled_button("➕ Create Session (Telethon)", callback_data="create|telethon")],
+            [styled_button("🔙 Main Dashboard", callback_data="mail_settings_back")]
         ])
         return await message.reply_text(text, reply_markup=keyboard)
 
@@ -142,9 +142,9 @@ async def start_handler(_, message):
             "💎 *100% automated protection with zero manual setup required.*"
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
-             InlineKeyboardButton("➕ Create Session (Telethon)", callback_data="create|telethon")],
-            [InlineKeyboardButton("🔙 Main Dashboard", callback_data="mail_settings_back")]
+            [styled_button("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
+             styled_button("➕ Create Session (Telethon)", callback_data="create|telethon")],
+            [styled_button("🔙 Main Dashboard", callback_data="mail_settings_back")]
         ])
         return await message.reply_text(text, reply_markup=keyboard)
 
@@ -157,9 +157,9 @@ async def start_handler(_, message):
             "• **Pyrogram**: Modern async Pyrogram format"
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📱 Telethon Session", callback_data="create|telethon"),
-             InlineKeyboardButton("⚡ Pyrogram Session", callback_data="create|pyrogram")],
-            [InlineKeyboardButton("🔙 Main Dashboard", callback_data="mail_settings_back")]
+            [styled_button("📱 Telethon Session", callback_data="create|telethon"),
+             styled_button("⚡ Pyrogram Session", callback_data="create|pyrogram")],
+            [styled_button("🔙 Main Dashboard", callback_data="mail_settings_back")]
         ])
         return await message.reply_text(text, reply_markup=keyboard)
 
@@ -167,7 +167,7 @@ async def start_handler(_, message):
 
 
 OVERVIEW_ANNOUNCEMENT_TEXT = (
-    "🚀 **AccStore Session Manager — Mega Update** 💎\n"
+    "🚀 **Onyx Session Manager — Mega Update** 💎\n"
     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
     "Hey Community! Here is what is new in today's update:\n\n"
     "📧 **Multi-Domain Temp-Mail**\n"
@@ -188,15 +188,15 @@ OVERVIEW_ANNOUNCEMENT_TEXT = (
 def overview_keyboard():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📧 Free Temp-Mail", callback_data="cb_overview_mail"),
-            InlineKeyboardButton("💎 Gmail Mailbox Vault", callback_data="cb_overview_vault"),
+            styled_button("📧 Free Temp-Mail", callback_data="cb_overview_mail"),
+            styled_button("💎 Gmail Mailbox Vault", callback_data="cb_overview_vault"),
         ],
         [
-            InlineKeyboardButton("🛡️ FloodWait Shield", callback_data="cb_overview_shield"),
-            InlineKeyboardButton("➕ Create Session", callback_data="cb_overview_create"),
+            styled_button("🛡️ FloodWait Shield", callback_data="cb_overview_shield"),
+            styled_button("➕ Create Session", callback_data="cb_overview_create"),
         ],
         [
-            InlineKeyboardButton("⚡ Main Dashboard", callback_data="cb_overview_main"),
+            styled_button("⚡ Main Dashboard", callback_data="cb_overview_main"),
         ]
     ])
 
@@ -224,10 +224,10 @@ async def cb_overview_handler(_, call: CallbackQuery):
             "💡 *Select an option below to proceed:*"
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⚙️ Open Self-Mail Vault", callback_data="mail_settings_open")],
-            [InlineKeyboardButton("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
-             InlineKeyboardButton("➕ Create Session (Telethon)", callback_data="create|telethon")],
-            [InlineKeyboardButton("🔙 Back to Announcement", callback_data="cb_overview_restore")]
+            [styled_button("⚙️ Open Self-Mail Vault", callback_data="mail_settings_open")],
+            [styled_button("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
+             styled_button("➕ Create Session (Telethon)", callback_data="create|telethon")],
+            [styled_button("🔙 Back to Announcement", callback_data="cb_overview_restore")]
         ])
         return await call.message.reply_text(text, reply_markup=keyboard)
 
@@ -279,9 +279,9 @@ async def cb_overview_handler(_, call: CallbackQuery):
             "💎 *100% automated protection with zero manual setup required.*"
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
-             InlineKeyboardButton("➕ Create Session (Telethon)", callback_data="create|telethon")],
-            [InlineKeyboardButton("🔙 Back to Announcement", callback_data="cb_overview_restore")]
+            [styled_button("➕ Create Session (Pyrogram)", callback_data="create|pyrogram"),
+             styled_button("➕ Create Session (Telethon)", callback_data="create|telethon")],
+            [styled_button("🔙 Back to Announcement", callback_data="cb_overview_restore")]
         ])
         return await call.message.reply_text(text, reply_markup=keyboard)
 
@@ -294,9 +294,9 @@ async def cb_overview_handler(_, call: CallbackQuery):
             "• **Pyrogram**: Modern async Pyrogram format"
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📱 Telethon Session", callback_data="create|telethon"),
-             InlineKeyboardButton("⚡ Pyrogram Session", callback_data="create|pyrogram")],
-            [InlineKeyboardButton("🔙 Back to Announcement", callback_data="cb_overview_restore")]
+            [styled_button("📱 Telethon Session", callback_data="create|telethon"),
+             styled_button("⚡ Pyrogram Session", callback_data="create|pyrogram")],
+            [styled_button("🔙 Back to Announcement", callback_data="cb_overview_restore")]
         ])
         return await call.message.reply_text(text, reply_markup=keyboard)
 
@@ -309,12 +309,143 @@ async def cb_overview_handler(_, call: CallbackQuery):
 # Only accessible by users listed in ADMIN_IDS in .env
 # ─────────────────────────────────────────────────────────────────────────────
 
-BROADCAST_STATE = {}
+def parse_sudo_duration(value):
+    """Parse durations such as 30m, 7d, 2w, or human-readable '30 days'."""
+    match = re.fullmatch(
+        r"(\d+)\s*(mo(?:nths?)?|s|sec(?:ond)?s?|m|min(?:ute)?s?|h|hours?|d|days?|w|weeks?|y|years?)",
+        str(value).strip().lower(),
+    )
+    if not match:
+        return None
+    amount = int(match.group(1))
+    unit = match.group(2)
+    if unit.startswith("mo") or unit.startswith("month"):
+        scale = 30 * 86400
+    elif unit in ("s", "sec", "second", "secs", "seconds"):
+        scale = 1
+    elif unit == "m" or unit.startswith("min"):
+        scale = 60
+    elif unit == "h" or unit.startswith("hour"):
+        scale = 3600
+    elif unit == "d" or unit.startswith("day"):
+        scale = 86400
+    elif unit == "w" or unit.startswith("week"):
+        scale = 604800
+    else:
+        scale = 31536000
+    seconds = amount * scale
+    return seconds if seconds > 0 else None
 
-BAN_STATE = {}
-DM_STATE = {}
 
-MAINTENANCE_MODE = False
+@app.on_message(filters.command("addsudo"))
+async def add_sudo_handler(_, message):
+    if not message.from_user or not is_admin(message.from_user.id):
+        return await message.reply_text("❌ Admin only.")
+    parts = message.command or []
+    if len(parts) < 3 or not parts[1].isdigit():
+        return await message.reply_text(
+            "Usage: `/addsudo <user_id> <duration>`\n"
+            "Examples: `/addsudo 123456789 30d`, `/addsudo 123456789 30 days`, `/addsudo 123456789 12h`.\n"
+            "Units: seconds, minutes, hours, days, weeks, months, years."
+        )
+    duration = parse_sudo_duration(" ".join(parts[2:]))
+    if duration is None:
+        return await message.reply_text("❌ Invalid duration. Use a positive value such as `30d`, `12h`, or `30 days`.")
+    target_id = int(parts[1])
+    expires_at = int(time.time()) + duration
+    meta = load_meta()
+    sudo_users = meta.get("sudo_users", {})
+    if not isinstance(sudo_users, dict):
+        sudo_users = {}
+    sudo_users[str(target_id)] = expires_at
+    meta["sudo_users"] = sudo_users
+    save_meta(meta)
+    config.SUDO_USERS[str(target_id)] = expires_at
+    expiry_text = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(expires_at))
+    await message.reply_text(f"✅ Paid access granted to `{target_id}` until `{expiry_text}`.")
+
+
+@app.on_message(filters.command("rmsudo"))
+async def remove_sudo_handler(_, message):
+    if not message.from_user or not is_admin(message.from_user.id):
+        return await message.reply_text("❌ Admin only.")
+    parts = message.command or []
+    if len(parts) != 2 or not parts[1].isdigit():
+        return await message.reply_text("Usage: `/rmsudo <user_id>`")
+    target_id = parts[1]
+    meta = load_meta()
+    sudo_users = meta.get("sudo_users", {})
+    if not isinstance(sudo_users, dict) or target_id not in sudo_users:
+        config.SUDO_USERS.pop(target_id, None)
+        return await message.reply_text(f"ℹ️ User `{target_id}` has no paid access grant.")
+    sudo_users.pop(target_id, None)
+    meta["sudo_users"] = sudo_users
+    save_meta(meta)
+    config.SUDO_USERS.pop(target_id, None)
+    await message.reply_text(f"✅ Paid access removed for `{target_id}`.")
+
+
+async def show_accessibility_panel(message):
+    rows = [[
+        styled_button("💎 Paid · selected users only", callback_data="access_mode|paid"),
+        styled_button("🆓 Free · open to all", callback_data="access_mode|free"),
+    ]]
+    now = time.time()
+    active = [(uid, config.sudo_expiry(uid)) for uid in config.SUDO_USERS]
+    active = [(uid, expiry) for uid, expiry in active if expiry > now]
+    active.sort(key=lambda item: item[0])
+    for uid, expiry in active[:50]:
+        expiry_text = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(expiry))
+        rows.append([styled_button(f"✖ Remove · {uid} · {expiry_text}", callback_data=f"sudo_remove|{uid}")])
+    rows.append([styled_button("🔙 Back to Admin", callback_data="admin_back")])
+    mode_label = "💎 PAID — admins and active sudo users only" if config.ACCESS_MODE == "paid" else "🆓 FREE — accessible to everyone"
+    text = (
+        "🔐 **Accessibility Mode**\n\n"
+        f"Current mode: **{mode_label}**\n"
+        f"Active sudo grants: `{len(active)}`\n\n"
+        "Paid mode requires a time-limited sudo grant. Admin commands: `/addsudo <user_id> <duration>` "
+        "and `/rmsudo <user_id>`. Supported units: seconds, minutes, hours, days, weeks, months, years."
+    )
+    await safe_edit(message, text, reply_markup=InlineKeyboardMarkup(rows))
+
+
+@app.on_callback_query(filters.regex(r"^admin_accessibility$"))
+async def admin_accessibility_callback(_, call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return await call.answer("Access Denied", show_alert=True)
+    await call.answer()
+    return await show_accessibility_panel(call.message)
+
+
+@app.on_callback_query(filters.regex(r"^access_mode\|(paid|free)$"))
+async def set_accessibility_mode_callback(_, call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return await call.answer("Access Denied", show_alert=True)
+    mode = call.matches[0].group(1)
+    config.ACCESS_MODE = mode
+    meta = load_meta()
+    meta["access_mode"] = mode
+    save_meta(meta)
+    log_admin_action(call.from_user.id, f"Accessibility mode set to {mode}")
+    await call.answer(f"Accessibility mode: {mode.upper()}", show_alert=True)
+    return await show_accessibility_panel(call.message)
+
+
+@app.on_callback_query(filters.regex(r"^sudo_remove\|(\d+)$"))
+async def remove_sudo_button_callback(_, call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return await call.answer("Access Denied", show_alert=True)
+    target_id = call.matches[0].group(1)
+    meta = load_meta()
+    sudo_users = meta.get("sudo_users", {})
+    if isinstance(sudo_users, dict):
+        sudo_users.pop(target_id, None)
+        meta["sudo_users"] = sudo_users
+        save_meta(meta)
+    config.SUDO_USERS.pop(target_id, None)
+    await call.answer(f"Paid access removed for {target_id}.", show_alert=True)
+    return await show_accessibility_panel(call.message)
+
 
 @app.on_message(filters.command("admin"))
 async def admin_handler(_, message):
@@ -346,7 +477,7 @@ async def admin_broadcast_callback(_, call: CallbackQuery):
         "Send the message you want to broadcast to all users.\n"
         "You can send **text, photo, video, document** — anything.\n\n"
         "Send /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 @app.on_callback_query(filters.regex(r"^admin_users:(\d+)$"))
@@ -404,14 +535,14 @@ async def admin_users_callback(_, call: CallbackQuery):
     # Pagination buttons
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton("◀️ Prev", callback_data=f"admin_users:{page - 1}"))
+        nav_buttons.append(styled_button("◀️ Prev", callback_data=f"admin_users:{page - 1}"))
     if page < total_pages - 1:
-        nav_buttons.append(InlineKeyboardButton("Next ▶️", callback_data=f"admin_users:{page + 1}"))
+        nav_buttons.append(styled_button("Next ▶️", callback_data=f"admin_users:{page + 1}"))
     
     keyboard_rows = []
     if nav_buttons:
         keyboard_rows.append(nav_buttons)
-    keyboard_rows.append([InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_back")])
+    keyboard_rows.append([styled_button("🔙 Back to Admin", callback_data="admin_back")])
     
     await call.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard_rows))
 
@@ -463,10 +594,10 @@ async def admin_stats_callback(_, call: CallbackQuery):
         f" ├ Concurrency: `{MAX_CONCURRENCY}`\n"
         f" ├ Active Tasks: `{active_task_count}` across `{active_task_users}` user(s)\n"
         f" ├ Asyncio Tasks: `{len(asyncio.all_tasks())}`\n"
-        f" └ Maintenance: `{'ON' if MAINTENANCE_MODE else 'OFF'}` • Whitelist: `{'ON' if WHITELIST_MODE else 'OFF'}`\n"
+        f" └ Maintenance: `{'ON' if config.MAINTENANCE_MODE else 'OFF'}` • Whitelist: `{'ON' if config.WHITELIST_MODE else 'OFF'}`\n"
     )
     
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_back")]])
+    keyboard = InlineKeyboardMarkup([[styled_button("🔙 Back to Admin", callback_data="admin_back")]])
     await call.message.edit_text(text, reply_markup=keyboard)
 
 @app.on_callback_query(filters.regex(r"^admin_export$"))
@@ -508,7 +639,7 @@ async def admin_ban_callback(_, call: CallbackQuery):
     BAN_STATE[call.from_user.id] = "ban"
     await call.message.edit_text(
         "🚫 **Ban User**\n\nSend the **user ID** to ban.\nBanned users won't be able to use the bot.\n\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 @app.on_callback_query(filters.regex(r"^admin_unban$"))
@@ -523,7 +654,7 @@ async def admin_unban_callback(_, call: CallbackQuery):
     ban_list = "\n".join([f"• `{uid}`" for uid in banned])
     await call.message.edit_text(
         f"✅ **Unban User**\n\nCurrently banned:\n{ban_list}\n\nSend the **user ID** to unban.\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 # ── DM User ──
@@ -534,7 +665,7 @@ async def admin_dm_callback(_, call: CallbackQuery):
     DM_STATE[call.from_user.id] = {"step": "awaiting_id"}
     await call.message.edit_text(
         "💬 **DM User**\n\nSend the **user ID** you want to message.\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 # ── Lookup User ──
@@ -545,7 +676,7 @@ async def admin_lookup_callback(_, call: CallbackQuery):
     DM_STATE[call.from_user.id] = {"step": "lookup"}
     await call.message.edit_text(
         "🔍 **Lookup User**\n\nSend the **user ID** to look up their details.\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 # ── Server Logs ──
@@ -594,7 +725,7 @@ async def admin_logs_callback(_, call: CallbackQuery):
             f"Uptime: `{format_uptime()}`\n"
             f"Tasks: `{len(asyncio.all_tasks())}` active asyncio tasks"
         )
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_back")]])
+    keyboard = InlineKeyboardMarkup([[styled_button("🔙 Back to Admin", callback_data="admin_back")]])
     await call.message.edit_text(logs, reply_markup=keyboard)
 
 
@@ -708,8 +839,8 @@ async def device_command(_, message):
     except Exception as e:
         text = f"❌ Failed to fetch VPS specs: `{e}`"
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔄 Refresh", callback_data="admin_device"),
-         InlineKeyboardButton("🔙 Admin Panel", callback_data="admin_back")]
+        [styled_button("🔄 Refresh", callback_data="admin_device"),
+         styled_button("🔙 Admin Panel", callback_data="admin_back")]
     ])
     await message.reply_text(text, reply_markup=keyboard)
 
@@ -723,8 +854,8 @@ async def admin_device_callback(_, call: CallbackQuery):
     except Exception as e:
         text = f"❌ Failed to fetch VPS specs: `{e}`"
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔄 Refresh", callback_data="admin_device"),
-         InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_back")]
+        [styled_button("🔄 Refresh", callback_data="admin_device"),
+         styled_button("🔙 Back to Admin", callback_data="admin_back")]
     ])
     await call.message.edit_text(text, reply_markup=keyboard)
 
@@ -733,14 +864,13 @@ async def admin_device_callback(_, call: CallbackQuery):
 async def admin_maint_callback(_, call: CallbackQuery):
     if not is_admin(call.from_user.id):
         return await call.answer("Access Denied", show_alert=True)
-    global MAINTENANCE_MODE
-    MAINTENANCE_MODE = not MAINTENANCE_MODE
+    config.MAINTENANCE_MODE = not config.MAINTENANCE_MODE
     meta = load_meta()
-    meta["maintenance"] = MAINTENANCE_MODE
+    meta["maintenance"] = config.MAINTENANCE_MODE
     save_meta(meta)
-    status = "🔴 ON — Only admins can use the bot" if MAINTENANCE_MODE else "🟢 OFF — Everyone can use the bot"
-    log_admin_action(call.from_user.id, f"Maintenance mode {'enabled' if MAINTENANCE_MODE else 'disabled'}")
-    await call.answer(f"Maintenance Mode: {'ON' if MAINTENANCE_MODE else 'OFF'}", show_alert=True)
+    status = "🔴 ON — Only admins can use the bot" if config.MAINTENANCE_MODE else "🟢 OFF — Everyone can use the bot"
+    log_admin_action(call.from_user.id, f"Maintenance mode {'enabled' if config.MAINTENANCE_MODE else 'disabled'}")
+    await call.answer(f"Maintenance Mode: {'ON' if config.MAINTENANCE_MODE else 'OFF'}", show_alert=True)
     total_users = len(meta.get("users", {}))
     total_packs = len(meta.get("zips", {}))
     banned_count = len(meta.get("banned_users", []))
@@ -792,11 +922,11 @@ async def admin_packs_callback(_, call: CallbackQuery):
 
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton("◀️", callback_data=f"admin_packs:{page-1}"))
+        nav.append(styled_button("◀️", callback_data=f"admin_packs:{page-1}"))
     if page < total_pages - 1:
-        nav.append(InlineKeyboardButton("▶️", callback_data=f"admin_packs:{page+1}"))
+        nav.append(styled_button("▶️", callback_data=f"admin_packs:{page+1}"))
     rows = [nav] if nav else []
-    rows.append([InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_back")])
+    rows.append([styled_button("🔙 Back to Admin", callback_data="admin_back")])
     await call.message.edit_text(text, reply_markup=InlineKeyboardMarkup(rows))
 
 # ── Disk Usage ──
@@ -837,7 +967,7 @@ async def admin_disk_callback(_, call: CallbackQuery):
         f"💿 Sessions Size: `{human_size(session_size)}`\n"
         f"📋 Registry: `{human_size(os.path.getsize(META_FILE) if os.path.exists(META_FILE) else 0)}`\n"
     )
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_back")]])
+    keyboard = InlineKeyboardMarkup([[styled_button("🔙 Back to Admin", callback_data="admin_back")]])
     await call.message.edit_text(text, reply_markup=keyboard)
 
 # ── Add Admin (runtime only) ──
@@ -850,7 +980,7 @@ async def admin_addadmin_callback(_, call: CallbackQuery):
     await call.message.edit_text(
         f"👑 **Manage Admins**\n\nCurrent admins: {current}\n\n"
         "Send a **user ID** to add as admin (runtime only).\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 # ── NEW: Remove Admin ──
@@ -863,7 +993,7 @@ async def admin_deladmin_callback(_, call: CallbackQuery):
     await call.message.edit_text(
         f"🗑️ **Remove Admin**\n\nCurrent admins: {current}\n\n"
         "Send the **user ID** to remove from admins.\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 # ── NEW: Top Users ──
@@ -889,7 +1019,7 @@ async def admin_top_users_callback(_, call: CallbackQuery):
             text += f"**{i}.** `{uid}` ({name}) — 📦 `{count}` packs\n"
     if not sorted_users:
         text += "_No packs uploaded yet._"
-    await call.message.edit_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_back")]]))
+    await call.message.edit_text(text, reply_markup=InlineKeyboardMarkup([[styled_button("🔙 Back", callback_data="admin_back")]]))
 
 # ── NEW: Prune Packs ──
 @app.on_callback_query(filters.regex(r"^admin_prune$"))
@@ -970,7 +1100,7 @@ async def admin_mail_vault_callback(_, call: CallbackQuery):
         return await safe_edit(
             call.message,
             "🔐 **Admin Mail Vault**\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nNo users have configured self-mail yet.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Return", callback_data="admin_panel_open")]])
+            reply_markup=InlineKeyboardMarkup([[styled_button("🔙 Return", callback_data="admin_panel_open")]])
         )
     
     lines = [
@@ -1016,13 +1146,13 @@ async def admin_mail_vault_callback(_, call: CallbackQuery):
         await safe_edit(
             call.message,
             f"🔐 **Admin Mail Vault**\n\nVault data exceeded message length and was sent as a document (`{len(vault)}` users).",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Return", callback_data="admin_panel_open")]])
+            reply_markup=InlineKeyboardMarkup([[styled_button("🔙 Return", callback_data="admin_panel_open")]])
         )
     else:
         await safe_edit(
             call.message,
             vault_text,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Return", callback_data="admin_panel_open")]])
+            reply_markup=InlineKeyboardMarkup([[styled_button("🔙 Return", callback_data="admin_panel_open")]])
         )
 
 
@@ -1034,7 +1164,7 @@ async def admin_search_pack_callback(_, call: CallbackQuery):
     DM_STATE[call.from_user.id] = {"step": "search_pack"}
     await call.message.edit_text(
         "🔎 **Search Pack**\n\nSend the **Pack ID** you want to find.\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 # ── NEW: Delete Pack ──
@@ -1045,7 +1175,7 @@ async def admin_del_pack_callback(_, call: CallbackQuery):
     DM_STATE[call.from_user.id] = {"step": "del_pack"}
     await call.message.edit_text(
         "💣 **Delete Pack**\n\nSend the **Pack ID** you want to forcefully delete.\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 # ── NEW: Set Announce ──
@@ -1056,7 +1186,7 @@ async def admin_set_announce_callback(_, call: CallbackQuery):
     DM_STATE[call.from_user.id] = {"step": "set_announce"}
     await call.message.edit_text(
         "📝 **Set Announcement**\n\nSend the text you want all users to see when they start the bot.\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 # ── NEW: Clear Announce ──
@@ -1064,8 +1194,7 @@ async def admin_set_announce_callback(_, call: CallbackQuery):
 async def admin_clear_announce_callback(_, call: CallbackQuery):
     if not is_admin(call.from_user.id):
         return await call.answer("Access Denied", show_alert=True)
-    global GLOBAL_ANNOUNCEMENT
-    GLOBAL_ANNOUNCEMENT = ""
+    config.GLOBAL_ANNOUNCEMENT = ""
     meta = load_meta()
     meta["announcement"] = ""
     save_meta(meta)
@@ -1079,7 +1208,7 @@ async def admin_kill_tasks_callback(_, call: CallbackQuery):
     DM_STATE[call.from_user.id] = {"step": "kill_tasks"}
     await call.message.edit_text(
         "🛑 **Kill User Tasks**\n\nSend the **user ID** whose background operations you want to terminate.\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="admin_back")]])
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_back")]])
     )
 
 # ── NEW: Restart Bot ──
@@ -1116,7 +1245,7 @@ async def admin_activity_callback(_, call: CallbackQuery):
         log_text = "\n".join(entries)
         text = f"📝 **Admin Activity Log** (Latest {len(entries)})\n━━━━━━━━━━━━━━━━━━━━━━\n\n{log_text}"
     
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_back")]])
+    keyboard = InlineKeyboardMarkup([[styled_button("🔙 Back to Admin", callback_data="admin_back")]])
     await call.message.edit_text(text, reply_markup=keyboard)
 
 # ── NEW: Active Tasks Monitor ──
@@ -1149,8 +1278,8 @@ async def admin_active_tasks_callback(_, call: CallbackQuery):
         )
     
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔄 Refresh", callback_data="admin_active_tasks")],
-        [InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_back")]
+        [styled_button("🔄 Refresh", callback_data="admin_active_tasks")],
+        [styled_button("🔙 Back to Admin", callback_data="admin_back")]
     ])
     await call.message.edit_text(text, reply_markup=keyboard)
 
@@ -1159,14 +1288,13 @@ async def admin_active_tasks_callback(_, call: CallbackQuery):
 async def admin_whitelist_callback(_, call: CallbackQuery):
     if not is_admin(call.from_user.id):
         return await call.answer("Access Denied", show_alert=True)
-    global WHITELIST_MODE
-    WHITELIST_MODE = not WHITELIST_MODE
+    config.WHITELIST_MODE = not config.WHITELIST_MODE
     meta = load_meta()
-    meta["whitelist"] = WHITELIST_MODE
+    meta["whitelist"] = config.WHITELIST_MODE
     save_meta(meta)
-    status = "ON — Only whitelisted users + admins can use the bot" if WHITELIST_MODE else "OFF — All users can use the bot"
-    log_admin_action(call.from_user.id, f"Whitelist mode {'enabled' if WHITELIST_MODE else 'disabled'}")
-    await call.answer(f"Whitelist Mode: {'ON' if WHITELIST_MODE else 'OFF'}", show_alert=True)
+    status = "ON — Only whitelisted users + admins can use the bot" if config.WHITELIST_MODE else "OFF — All users can use the bot"
+    log_admin_action(call.from_user.id, f"Whitelist mode {'enabled' if config.WHITELIST_MODE else 'disabled'}")
+    await call.answer(f"Whitelist Mode: {'ON' if config.WHITELIST_MODE else 'OFF'}", show_alert=True)
     total_users = len(meta.get("users", {}))
     total_packs = len(meta.get("zips", {}))
     banned_count = len(meta.get("banned_users", []))
@@ -1178,6 +1306,134 @@ async def admin_whitelist_callback(_, call: CallbackQuery):
         "━━━━━━━━━━━━━━━━━━━━━━"
     )
     await call.message.edit_text(text, reply_markup=admin_keyboard())
+
+async def show_whitelist_panel(message, user_id):
+    if not is_admin(user_id):
+        return
+    rows = []
+    for uid in sorted(config.WHITELISTED_USERS):
+        rows.append([styled_button(f"✖ Remove {uid}", callback_data=f"whitelist_remove|{uid}")])
+    rows.append([styled_button("➕ Add user ID", callback_data="whitelist_add")])
+    rows.append([styled_button("🔙 Back to Admin", callback_data="admin_back")])
+    text = (
+        "👥 **Whitelist Management**\n\n"
+        f"Mode: **{'ON' if config.WHITELIST_MODE else 'OFF'}**\n"
+        f"Allowed users: `{len(config.WHITELISTED_USERS)}`\n"
+        "Choose a listed ID to remove it, or add a user by numeric Telegram ID."
+    )
+    await safe_edit(message, text, reply_markup=InlineKeyboardMarkup(rows))
+
+
+@app.on_callback_query(filters.regex(r"^admin_whitelist_manage$"))
+async def admin_whitelist_manage_callback(_, call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return await call.answer("Access Denied", show_alert=True)
+    await call.answer()
+    return await show_whitelist_panel(call.message, call.from_user.id)
+
+
+@app.on_callback_query(filters.regex(r"^whitelist_add$"))
+async def whitelist_add_callback(_, call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return await call.answer("Access Denied", show_alert=True)
+    DM_STATE[call.from_user.id] = {"step": "whitelist_add"}
+    await call.answer()
+    return await safe_edit(
+        call.message,
+        "Send the numeric Telegram user ID to allow while whitelist mode is enabled.",
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_whitelist_manage")]])
+    )
+
+
+@app.on_callback_query(filters.regex(r"^whitelist_remove\|(-?\d+)$"))
+async def whitelist_remove_callback(_, call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return await call.answer("Access Denied", show_alert=True)
+    target = int(call.matches[0].group(1))
+    config.WHITELISTED_USERS.discard(target)
+    meta = load_meta()
+    meta["whitelisted_users"] = sorted(config.WHITELISTED_USERS)
+    save_meta(meta)
+    await call.answer(f"Removed {target} from whitelist.", show_alert=True)
+    return await show_whitelist_panel(call.message, call.from_user.id)
+
+
+async def show_force_join_panel(message, user_id, edit=True):
+    if not is_admin(user_id):
+        return
+    meta = load_meta()
+    chats = meta.get("force_join_chats", {})
+    if not isinstance(chats, dict):
+        chats = {}
+    rows = []
+    for chat_id, info in chats.items():
+        title = info.get("title", chat_id) if isinstance(info, dict) else str(chat_id)
+        rows.append([styled_button(f"✖ Remove · {title}", callback_data=f"forcejoin_remove|{chat_id}")])
+    rows.append([styled_button("➕ Add channel/group by ID", callback_data="forcejoin_add")])
+    rows.append([styled_button("🔙 Back to Admin", callback_data="admin_back")])
+    text = (
+        "🔒 **Force Join**\n\n"
+        "Users must join each listed chat before using the bot.\n"
+        "The bot needs permission to check membership and create invite links.\n\n"
+        f"Configured chats: `{len(chats)}`\n"
+        "Tap a chat row to remove that requirement."
+    )
+    markup = InlineKeyboardMarkup(rows)
+    if edit:
+        await safe_edit(message, text, reply_markup=markup)
+    else:
+        await app.send_message(message.chat.id, text, reply_markup=markup)
+
+
+@app.on_callback_query(filters.regex(r"^admin_force_join$"))
+async def admin_force_join_callback(_, call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return await call.answer("Access Denied", show_alert=True)
+    await call.answer()
+    return await show_force_join_panel(call.message, call.from_user.id)
+
+
+@app.on_callback_query(filters.regex(r"^forcejoin_add$"))
+async def forcejoin_add_callback(_, call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return await call.answer("Access Denied", show_alert=True)
+    DM_STATE[call.from_user.id] = {"step": "force_join_add"}
+    await call.answer()
+    return await safe_edit(
+        call.message,
+        "Send the numeric chat ID for the channel or group. The bot must already be an administrator there.",
+        reply_markup=InlineKeyboardMarkup([[styled_button("❌ Cancel", callback_data="admin_force_join")]])
+    )
+
+
+@app.on_callback_query(filters.regex(r"^forcejoin_remove\|(-?\d+)$"))
+async def forcejoin_remove_callback(_, call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return await call.answer("Access Denied", show_alert=True)
+    chat_id = call.matches[0].group(1)
+    meta = load_meta()
+    chats = meta.setdefault("force_join_chats", {})
+    chats.pop(chat_id, None)
+    save_meta(meta)
+    config.FORCE_JOIN_CHATS.clear()
+    config.FORCE_JOIN_CHATS.update(chats)
+    _FORCE_JOIN_CACHE.clear()
+    await call.answer("Force Join removed.", show_alert=True)
+    return await show_force_join_panel(call.message, call.from_user.id)
+
+
+@app.on_callback_query(filters.regex(r"^forcejoin_check$"))
+async def forcejoin_check_callback(_, call: CallbackQuery):
+    if not call.from_user:
+        return await call.answer("Could not identify your account.", show_alert=True)
+    allowed, missing, error = await force_join_status(call.from_user.id, refresh=True)
+    if error:
+        return await call.answer("Membership check failed. Please contact the bot admin.", show_alert=True)
+    if missing:
+        return await call.answer("You still need to join the required chat(s).", show_alert=True)
+    await call.answer("✅ Membership verified. You can now use the bot.", show_alert=True)
+    return await safe_edit(call.message, "✅ Membership verified. Send /start or retry the action you wanted to use.")
+
 
 @app.on_callback_query(filters.regex(r"^admin_back$"))
 async def admin_back_callback(_, call: CallbackQuery):
@@ -1245,16 +1501,16 @@ async def ban_check_middleware(_, message):
     if message.chat and "private" not in str(message.chat.type).lower():
         raise StopPropagation
     meta = load_meta()
-    banned = meta.get("banned_users", [])
-    if message.from_user.id in banned:
+    banned = {str(uid) for uid in meta.get("banned_users", [])}
+    if str(message.from_user.id) in banned:
         await message.reply_text("🚫 **You are banned from using this bot.**\nContact the admin if you think this is a mistake.")
         raise StopPropagation
 
 @app.on_callback_query(group=-9)
 async def ban_check_callback_middleware(_, call):
     meta = load_meta()
-    banned = meta.get("banned_users", [])
-    if call.from_user.id in banned:
+    banned = {str(uid) for uid in meta.get("banned_users", [])}
+    if str(call.from_user.id) in banned:
         await call.answer("🚫 You are banned from this bot.", show_alert=True)
         raise StopPropagation
 
@@ -1304,6 +1560,48 @@ async def admin_state_handler(_, message):
             if text.startswith("/"):
                 DM_STATE.pop(uid, None)
                 return
+
+            if state.get("step") == "whitelist_add":
+                DM_STATE.pop(uid, None)
+                if not text.lstrip("-").isdigit():
+                    return await message.reply_text("❌ Send a numeric Telegram user ID.")
+                target_id = int(text)
+                config.WHITELISTED_USERS.add(target_id)
+                meta = load_meta()
+                meta["whitelisted_users"] = sorted(config.WHITELISTED_USERS)
+                save_meta(meta)
+                return await message.reply_text(f"✅ User `{target_id}` added to the whitelist.")
+
+            if state.get("step") == "force_join_add":
+                DM_STATE.pop(uid, None)
+                if not text.lstrip("-").isdigit():
+                    return await message.reply_text("❌ Send a numeric channel/group chat ID.")
+                chat_id = int(text)
+                try:
+                    chat = await app.get_chat(chat_id)
+                    invite = await app.export_chat_invite_link(chat_id)
+                except Exception as exc:
+                    return await message.reply_text(
+                        "❌ Could not access that chat or create an invite link. Add the bot as an administrator "
+                        "with permission to invite users and check members, then try again.\n"
+                        f"Details: `{type(exc).__name__}`"
+                    )
+                meta = load_meta()
+                force_chats = meta.get("force_join_chats", {})
+                if not isinstance(force_chats, dict):
+                    force_chats = {}
+                meta["force_join_chats"] = force_chats
+                force_chats[str(chat.id)] = {
+                    "chat_id": int(chat.id),
+                    "title": chat.title or str(chat.id),
+                    "invite_link": invite,
+                }
+                save_meta(meta)
+                config.FORCE_JOIN_CHATS.clear()
+                config.FORCE_JOIN_CHATS.update(force_chats)
+                _FORCE_JOIN_CACHE.clear()
+                await message.reply_text(f"✅ Force Join enabled for **{chat.title or chat.id}** (`{chat.id}`).")
+                return await show_force_join_panel(message, uid, edit=False)
 
             if state.get("step") == "awaiting_id":
                 meta = load_meta()
@@ -1359,9 +1657,9 @@ async def admin_state_handler(_, message):
                     f"👑 Admin: {is_adm}\n"
                 )
                 keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("💬 DM User", callback_data="admin_dm"),
-                     InlineKeyboardButton("🚫 Ban User" if target_id not in banned else "✅ Unban User", callback_data="admin_ban" if target_id not in banned else "admin_unban")],
-                    [InlineKeyboardButton("🔙 Back to Admin", callback_data="admin_back")]
+                    [styled_button("💬 DM User", callback_data="admin_dm"),
+                     styled_button("🚫 Ban User" if target_id not in banned else "✅ Unban User", callback_data="admin_ban" if target_id not in banned else "admin_unban")],
+                    [styled_button("🔙 Back to Admin", callback_data="admin_back")]
                 ])
                 return await message.reply_text(info, reply_markup=keyboard)
 
@@ -1426,8 +1724,8 @@ async def admin_state_handler(_, message):
                     owner_id = z.get('owner_id', z.get('owner'))
                     name = z.get('name') or f"Pack {zid}"
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("📂 Open Pack", callback_data=f"zip|open|{zid}")],
-                        [InlineKeyboardButton("💣 Force Delete", callback_data=f"zip|confirm_destroy|{zid}")]
+                        [styled_button("📂 Open Pack", callback_data=f"zip|open|{zid}")],
+                        [styled_button("💣 Force Delete", callback_data=f"zip|confirm_destroy|{zid}")]
                     ])
                     await message.reply_text(
                         f"📦 **Pack #{zid}** — `{name}`\n"
@@ -1455,8 +1753,7 @@ async def admin_state_handler(_, message):
             # ── Set Announce flow ──
             if state.get("step") == "set_announce":
                 DM_STATE.pop(uid, None)
-                global GLOBAL_ANNOUNCEMENT
-                GLOBAL_ANNOUNCEMENT = text
+                config.GLOBAL_ANNOUNCEMENT = text
                 meta = load_meta()
                 meta["announcement"] = text
                 save_meta(meta)
@@ -1491,7 +1788,7 @@ async def admin_state_handler(_, message):
 # Maintenance mode middleware — blocks non-admins when maintenance is on
 @app.on_message(group=-8)
 async def maintenance_middleware(_, message):
-    if not MAINTENANCE_MODE:
+    if not config.MAINTENANCE_MODE:
         return
     if not message.from_user:
         return
@@ -1502,7 +1799,7 @@ async def maintenance_middleware(_, message):
 
 @app.on_callback_query(group=-8)
 async def maintenance_callback_middleware(_, call):
-    if not MAINTENANCE_MODE:
+    if not config.MAINTENANCE_MODE:
         return
     if is_admin(call.from_user.id):
         return
@@ -1512,27 +1809,128 @@ async def maintenance_callback_middleware(_, call):
 # Whitelist mode middleware — blocks non-whitelisted users when whitelist is on
 @app.on_message(group=-7)
 async def whitelist_middleware(_, message):
-    if not WHITELIST_MODE:
-        return
     if not message.from_user:
         return
-    if is_admin(message.from_user.id):
+    user_id = message.from_user.id
+    if is_admin(user_id):
         return
-    if message.from_user.id in WHITELISTED_USERS:
-        return
-    await message.reply_text("🔐 **Access Restricted**\nThis bot is currently in whitelist-only mode. Contact an admin for access.")
-    raise StopPropagation
+    if config.ACCESS_MODE == "paid" and not config.has_access(user_id):
+        await message.reply_text("🔐 **Paid Access Mode**\nAsk an admin for a time-limited sudo grant.")
+        raise StopPropagation
+    if config.WHITELIST_MODE and user_id not in config.WHITELISTED_USERS:
+        await message.reply_text("🔐 **Access Restricted**\nThis bot is currently in whitelist-only mode. Contact an admin for access.")
+        raise StopPropagation
 
 @app.on_callback_query(group=-7)
 async def whitelist_callback_middleware(_, call):
-    if not WHITELIST_MODE:
+    if not call.from_user:
         return
-    if is_admin(call.from_user.id):
+    user_id = call.from_user.id
+    if is_admin(user_id):
         return
-    if call.from_user.id in WHITELISTED_USERS:
+    if config.ACCESS_MODE == "paid" and not config.has_access(user_id):
+        await call.answer("🔐 Paid Access Mode. Ask an admin for a sudo grant.", show_alert=True)
+        raise StopPropagation
+    if config.WHITELIST_MODE and user_id not in config.WHITELISTED_USERS:
+        await call.answer("🔐 Bot is in whitelist mode. Contact admin.", show_alert=True)
+        raise StopPropagation
+
+
+_FORCE_JOIN_CACHE = {}
+_FORCE_JOIN_CACHE_TTL = 20.0
+
+
+def _member_status_ok(member):
+    status = getattr(member, "status", None)
+    value = getattr(status, "value", status)
+    if str(value).lower() in {"owner", "administrator", "member"}:
+        return True
+    return str(value).lower() == "restricted" and bool(getattr(member, "is_member", False))
+
+
+async def force_join_status(user_id, refresh=False):
+    now = time.monotonic()
+    cached = _FORCE_JOIN_CACHE.get(int(user_id))
+    if not refresh and cached and now - cached[0] < _FORCE_JOIN_CACHE_TTL:
+        return cached[1], cached[2], cached[3]
+    missing, errors = [], []
+    for chat_id, info in config.FORCE_JOIN_CHATS.items():
+        try:
+            member = await app.get_chat_member(int(chat_id), int(user_id))
+            if not _member_status_ok(member):
+                missing.append((str(chat_id), info))
+        except UserNotParticipant:
+            missing.append((str(chat_id), info))
+        except Exception as exc:
+            errors.append((str(chat_id), type(exc).__name__))
+    allowed = not missing and not errors
+    _FORCE_JOIN_CACHE[int(user_id)] = (now, allowed, missing, errors)
+    return allowed, missing, errors
+
+
+async def _send_force_join_prompt(message, user_id, missing, errors):
+    rows = []
+    for chat_id, info in missing:
+        title = info.get("title", chat_id) if isinstance(info, dict) else chat_id
+        link = info.get("invite_link") if isinstance(info, dict) else None
+        if link:
+            rows.append([styled_button(f"📣 Join · {title}", url=link)])
+    rows.append([styled_button("✅ Check membership", callback_data="forcejoin_check")])
+    reason = "Join all required chats, then tap Check membership."
+    if errors:
+        reason += "\nSome membership checks failed; ask the admin to verify the bot's chat permissions."
+    await message.reply_text(
+        "🔒 **Join Required**\n\n" + reason,
+        reply_markup=InlineKeyboardMarkup(rows)
+    )
+
+
+@app.on_message(group=-5)
+async def force_join_message_middleware(_, message):
+    if not message.from_user or is_admin(message.from_user.id):
         return
-    await call.answer("🔐 Bot is in whitelist mode. Contact admin.", show_alert=True)
+    if not message.chat or "private" not in str(message.chat.type).lower() or not config.FORCE_JOIN_CHATS:
+        return
+    allowed, missing, errors = await force_join_status(message.from_user.id)
+    if allowed:
+        return
+    await _send_force_join_prompt(message, message.from_user.id, missing, errors)
     raise StopPropagation
+
+
+@app.on_callback_query(group=-5)
+async def force_join_callback_middleware(_, call):
+    if not call.from_user or is_admin(call.from_user.id) or not config.FORCE_JOIN_CHATS:
+        return
+    if call.data == "forcejoin_check":
+        return
+    allowed, missing, errors = await force_join_status(call.from_user.id)
+    if allowed:
+        return
+    await _send_force_join_prompt(call.message, call.from_user.id, missing, errors)
+    await call.answer("Join the required chat(s) first.", show_alert=True)
+    raise StopPropagation
+
+
+@app.on_callback_query(group=-4)
+async def pack_ownership_callback_middleware(_, call):
+    if not call.from_user or is_admin(call.from_user.id):
+        return
+    parts = (call.data or "").split("|")
+    prefixes_at_index = {
+        "zip": 2, "dev": 2, "mailbind": 2, "shift": 2, "tfa": 2, "comm": 2,
+        "otp": 1, "term_dev": 1, "do_term_dev": 1, "term_all_dev": 1,
+        "do_term_all_dev": 1, "refresh_dev": 1, "term_self": 1,
+        "do_term_self": 1, "direct_otp": 1,
+    }
+    if not parts or parts[0] not in prefixes_at_index:
+        return
+    idx = prefixes_at_index[parts[0]]
+    if idx >= len(parts) or not parts[idx].lstrip("-").isdigit():
+        return
+    if not zip_belongs_to_user(int(parts[idx]), call.from_user.id):
+        await call.answer("🚫 You don't have access to this pack.", show_alert=True)
+        raise StopPropagation
 
 
 @app.on_message(filters.command("ping"))
@@ -1588,8 +1986,6 @@ async def admin_panel_open_callback(_, call: CallbackQuery):
 
 @app.on_callback_query(filters.regex(r"^user_packs:(\d+)$"))
 async def user_packs_callback(_, call: CallbackQuery):
-    if not is_admin(call.from_user.id):
-        return await call.answer("⛔ Admin only.", show_alert=True)
     page = int(call.matches[0].group(1))
     meta = load_meta()
     zips = meta.get("zips", {})
@@ -1599,9 +1995,9 @@ async def user_packs_callback(_, call: CallbackQuery):
     
     if not user_zips:
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Create Telethon Pack", callback_data="create|telethon"),
-             InlineKeyboardButton("➕ Create Pyrogram Pack", callback_data="create|pyrogram")],
-            [InlineKeyboardButton("🔙 Back to Start", callback_data="start_menu")]
+            [styled_button("➕ Create Telethon Pack", callback_data="create|telethon"),
+             styled_button("➕ Create Pyrogram Pack", callback_data="create|pyrogram")],
+            [styled_button("🔙 Back to Start", callback_data="start_menu")]
         ])
         return await safe_edit(
             call.message,
@@ -1619,16 +2015,16 @@ async def user_packs_callback(_, call: CallbackQuery):
     for zid, z in chunk:
         name = z.get("name") or f"Pack {zid}"
         cnt = len(get_session_files(zid))
-        keyboard_rows.append([InlineKeyboardButton(f"📂 #{zid} {name} ({cnt} sessions)", callback_data=f"zip|open|{zid}")])
+        keyboard_rows.append([styled_button(f"📂 #{zid} {name} ({cnt} sessions)", callback_data=f"zip|open|{zid}")])
     
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton("◀️ Prev", callback_data=f"user_packs:{page-1}"))
+        nav.append(styled_button("◀️ Prev", callback_data=f"user_packs:{page-1}"))
     if page < total_pages - 1:
-        nav.append(InlineKeyboardButton("Next ▶️", callback_data=f"user_packs:{page+1}"))
+        nav.append(styled_button("Next ▶️", callback_data=f"user_packs:{page+1}"))
     if nav:
         keyboard_rows.append(nav)
-    keyboard_rows.append([InlineKeyboardButton("🔙 Back to Start", callback_data="start_menu")])
+    keyboard_rows.append([styled_button("🔙 Back to Start", callback_data="start_menu")])
     
     await safe_edit(call.message, f"📦 **My Session Packs** (Page {page + 1}/{total_pages})\nSelect a pack to manage:", reply_markup=InlineKeyboardMarkup(keyboard_rows))
 
@@ -2116,10 +2512,10 @@ async def prompt_handler(_, message):
             if clean_digits.isdigit() and 7 <= len(clean_digits) <= 16:
                 keyboard = InlineKeyboardMarkup([
                     [
-                        InlineKeyboardButton("📲 Create Telethon Pack", callback_data="create|telethon"),
-                        InlineKeyboardButton("📲 Create Pyrogram Pack", callback_data="create|pyrogram")
+                        styled_button("📲 Create Telethon Pack", callback_data="create|telethon"),
+                        styled_button("📲 Create Pyrogram Pack", callback_data="create|pyrogram")
                     ],
-                    [InlineKeyboardButton("🔙 Back to Start", callback_data="start_menu")]
+                    [styled_button("🔙 Back to Start", callback_data="start_menu")]
                 ])
                 return await message.reply_text(
                     f"📱 **Phone Number Detected:** `+{clean_digits}`\n\n"
@@ -2527,9 +2923,9 @@ async def prompt_handler(_, message):
 async def photo_prompt_handler(_, message):
     state = PROMPT_STATE.get(message.from_user.id)
     if not state or state.get("action") != "change_avatar":
-        _photo_rows = [[InlineKeyboardButton("🔙 Back to Start", callback_data="start_menu")]]
+        _photo_rows = [[styled_button("🔙 Back to Start", callback_data="start_menu")]]
         if is_admin(message.from_user.id):
-            _photo_rows.insert(0, [InlineKeyboardButton("📦 My Packs", callback_data="user_packs:0")])
+            _photo_rows.insert(0, [styled_button("📦 My Packs", callback_data="user_packs:0")])
         keyboard = InlineKeyboardMarkup(_photo_rows)
         return await message.reply_text(
             "🖼 **Photo Received**\n\n"
@@ -2807,7 +3203,8 @@ async def mailbind_actions(_, call: CallbackQuery):
             return await call.answer(f"⚠️ Pack #{zip_id} is currently running an operation. Please wait!", show_alert=True)
         await call.answer()
         async with register_user_task(call.from_user.id, call.message), lock_pack(zip_id):
-            return await run_bind_email(call, zip_id, mode=action)
+            async with config.MAIL_BIND_SEMAPHORE:
+                return await run_bind_email(call, zip_id, mode=action)
 
 
 @app.on_callback_query(filters.regex(r"^mail_"))
@@ -3169,8 +3566,8 @@ async def device_actions(_, call: CallbackQuery):
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("🗑 Confirm Revoke", callback_data=f"dev|remove|{zip_id}"),
-                    InlineKeyboardButton("❌ Cancel", callback_data=f"dev|back_devices|{zip_id}"),
+                    styled_button("🗑 Confirm Revoke", callback_data=f"dev|remove|{zip_id}"),
+                    styled_button("❌ Cancel", callback_data=f"dev|back_devices|{zip_id}"),
                 ]
             ]
         )
@@ -3249,8 +3646,8 @@ async def handle_terminate_device(_, call: CallbackQuery):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🗑 Confirm", callback_data=f"do_term_dev|{zip_id}|{device_hash}"),
-                InlineKeyboardButton("❌ Cancel", callback_data=f"refresh_dev|{zip_id}"),
+                styled_button("🗑 Confirm", callback_data=f"do_term_dev|{zip_id}|{device_hash}"),
+                styled_button("❌ Cancel", callback_data=f"refresh_dev|{zip_id}"),
             ]
         ]
     )
@@ -3337,8 +3734,8 @@ async def handle_terminate_all_devices(_, call: CallbackQuery):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🗑 Confirm Revoke All", callback_data=f"do_term_all_dev|{zip_id}"),
-                InlineKeyboardButton("❌ Cancel", callback_data=f"refresh_dev|{zip_id}"),
+                styled_button("🗑 Confirm Revoke All", callback_data=f"do_term_all_dev|{zip_id}"),
+                styled_button("❌ Cancel", callback_data=f"refresh_dev|{zip_id}"),
             ]
         ]
     )
@@ -3496,10 +3893,10 @@ async def handle_terminate_self(_, call: CallbackQuery):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("❌ Cancel (Keep Account Safe)", callback_data=f"refresh_dev|{zip_id}"),
+                styled_button("❌ Cancel (Keep Account Safe)", callback_data=f"refresh_dev|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("💀 Yes, Permanently Terminate & Log Out", callback_data=f"do_term_self|{zip_id}"),
+                styled_button("💀 Yes, Permanently Terminate & Log Out", callback_data=f"do_term_self|{zip_id}"),
             ]
         ]
     )

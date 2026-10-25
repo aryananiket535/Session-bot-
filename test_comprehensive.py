@@ -1,5 +1,9 @@
 import asyncio
 import os
+import unittest
+os.environ.setdefault("API_ID", "12345")
+os.environ.setdefault("API_HASH", "0123456789abcdef0123456789abcdef")
+os.environ.setdefault("BOT_TOKEN", "12345:abcdefghijklmnopqrstuvwxyz0123456789abcdef")
 import sys
 import json
 import sqlite3
@@ -447,3 +451,17 @@ if __name__ == "__main__":
     print("=" * 60)
     print("ALL TESTS PASSED SUCCESSFULLY!")
     print("=" * 60)
+
+
+class TestComprehensiveFunctions(unittest.TestCase):
+    def test_meta_and_lock(self): test_meta_and_lock()
+    def test_device_params(self): test_device_params()
+    def test_session_parsing(self): test_session_parsing()
+    def test_admin_user_resolution(self): test_admin_user_resolution()
+    def test_keyboards_and_routes(self): test_keyboards_and_routes()
+    def test_clean_session_db_export(self): test_clean_session_db_export()
+    def test_authentic_phone_extraction(self): test_authentic_phone_extraction()
+    def test_unpack_10_columns_and_universal_format(self): test_unpack_10_columns_and_universal_format()
+    def test_terminate_bot_confirmation(self): test_terminate_bot_confirmation()
+    def test_pyrogram_duplicate_column_immunity(self): test_pyrogram_duplicate_column_immunity()
+    def test_country_detection_and_split(self): test_country_detection_and_split()

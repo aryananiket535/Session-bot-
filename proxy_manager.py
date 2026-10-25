@@ -1,5 +1,5 @@
 # ==============================================================================
-# AccStore Session Manager — Unified IMAP Proxy Pool & Auto-Failover Engine
+# Onyx Session Manager — Unified IMAP Proxy Pool & Auto-Failover Engine
 # ==============================================================================
 # IMPORTANT ARCHITECTURAL DIRECTIVE:
 # - Telegram Accounts / Sessions MUST NOT process through proxies (direct VPS connection).

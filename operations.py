@@ -1,5 +1,5 @@
 # ==============================================================================
-# AccStore Session Manager — Account & Pack Operations
+# Onyx Session Manager — Account & Pack Operations
 # ==============================================================================
 
 import config
@@ -1747,9 +1747,17 @@ async def run_bind_email(call, zip_id, mode="self"):
     
     results = []
     groups = {}
+    batch_floodwait_seconds = None
     
-    # ── Sequential 1-by-1 Execution Loop ──
+    # Each account's send/OTP/verify remains sequential; bounded flow-level concurrency
+    # is applied at the handler, and Telegram FloodWait stops further sends in this batch.
     for idx, file_path in enumerate(files, 1):
+        if batch_floodwait_seconds is not None:
+            detail = f"Skipped after Telegram FloodWait ({batch_floodwait_seconds}s); retry this pack later."
+            groups.setdefault("rate_limited", []).append(file_path)
+            results.append({"phone": os.path.basename(file_path).lstrip("+").replace(".session", ""), "email": "N/A", "status": "rate_limited", "detail": detail})
+            await progress.update(1, f"⏳ Remaining accounts paused after FloodWait ({batch_floodwait_seconds}s)")
+            continue
         session_type = detect_session_type(file_path)
         session_name = os.path.basename(file_path).replace(".session", "")
         workdir = os.path.dirname(file_path)
@@ -1862,31 +1870,13 @@ async def run_bind_email(call, zip_id, mode="self"):
                                 ))
                                 send_ok = True
                             except FloodWait as fw:
-                                # Dedicated FloodWait proxy failover (proxy ONLY used when FloodWait hit!)
-                                fw_proxy = get_floodwait_pyro_proxy(session_id=phone)
-                                if fw_proxy:
-                                    await progress.update(0, f"+{phone}: FloodWait ({fw.value}s) on VPS IP! Switching to failover proxy...")
-                                    try:
-                                        async with make_pyro_client(session_name, workdir=workdir, proxy=fw_proxy) as fw_client:
-                                            sent_code = await fw_client.invoke(pyro_functions.account.SendVerifyEmailCode(
-                                                purpose=pyro_types.EmailVerifyPurposeLoginChange(),
-                                                email=target_email
-                                            ))
-                                            send_ok = True
-                                            client = fw_client
-                                            status_detail = "Bypassed FloodWait via failover proxy"
-                                    except FloodWait as fw2:
-                                        status = "rate_limited"
-                                        status_detail = f"FloodWait: {fw2.value}s"
-                                        break
-                                    except Exception as fw_err:
-                                        status = "rate_limited"
-                                        status_detail = f"FloodWait: {fw.value}s ({fw_err})"
-                                        break
-                                else:
-                                    status = "rate_limited"
-                                    status_detail = f"FloodWait: {fw.value}s"
-                                    break
+                                # FloodWait is account/server-side; rotating the IP won't clear it.
+                                # Do not open a second client on the same session or use it after close.
+                                batch_floodwait_seconds = max(1, int(getattr(fw, "value", 1)))
+                                status = "rate_limited"
+                                status_detail = f"Telegram FloodWait: {batch_floodwait_seconds}s; stopped further sends in this pack."
+                                await progress.update(0, f"⏳ +{phone}: Telegram asked us to pause for {batch_floodwait_seconds}s; stopping this batch safely.")
+                                break
                             except Exception as send_err:
                                 err_str = str(send_err)
                                 if "EMAIL_NOT_ALLOWED" in err_str:
@@ -2039,34 +2029,12 @@ async def run_bind_email(call, zip_id, mode="self"):
                                     ))
                                     send_ok = True
                                 except FloodWaitError as fw:
-                                    # Dedicated FloodWait proxy failover (proxy ONLY used when FloodWait hit!)
-                                    fw_proxy = get_floodwait_tele_proxy(session_id=phone)
-                                    if fw_proxy:
-                                        await progress.update(0, f"+{phone}: FloodWait ({fw.seconds}s) on VPS IP! Switching to failover proxy...")
-                                        try:
-                                            await safe_telethon_disconnect(client)
-                                            client = None
-                                            fw_client = make_tele_client(session_obj, proxy=fw_proxy)
-                                            await asyncio.wait_for(fw_client.connect(), timeout=CONNECT_TIMEOUT)
-                                            sent_code = await fw_client(tele_functions.account.SendVerifyEmailCodeRequest(
-                                                purpose=tele_types.EmailVerifyPurposeLoginChange(),
-                                                email=target_email
-                                            ))
-                                            send_ok = True
-                                            client = fw_client
-                                            status_detail = "Bypassed FloodWait via failover proxy"
-                                        except FloodWaitError as fw2:
-                                            status = "rate_limited"
-                                            status_detail = f"FloodWait: {fw2.seconds}s"
-                                            break
-                                        except Exception as fw_err:
-                                            status = "rate_limited"
-                                            status_detail = f"FloodWait: {fw.seconds}s ({fw_err})"
-                                            break
-                                    else:
-                                        status = "rate_limited"
-                                        status_detail = f"FloodWait: {fw.seconds}s"
-                                        break
+                                    # Respect Telegram's server-provided wait; IP rotation cannot bypass account limits.
+                                    batch_floodwait_seconds = max(1, int(getattr(fw, "seconds", 1)))
+                                    status = "rate_limited"
+                                    status_detail = f"Telegram FloodWait: {batch_floodwait_seconds}s; stopped further sends in this pack."
+                                    await progress.update(0, f"⏳ +{phone}: Telegram asked us to pause for {batch_floodwait_seconds}s; stopping this batch safely.")
+                                    break
                                 except Exception as send_err:
                                     err_str = str(send_err)
                                     if "EMAIL_NOT_ALLOWED" in err_str:
@@ -2160,8 +2128,9 @@ async def run_bind_email(call, zip_id, mode="self"):
             status_detail = "Dead / revoked session"
         except (FloodWait, FloodWaitError) as fw:
             status = "rate_limited"
-            secs = getattr(fw, "value", getattr(fw, "seconds", 0))
-            status_detail = f"FloodWait: {secs}s"
+            secs = max(1, int(getattr(fw, "value", getattr(fw, "seconds", 1))))
+            batch_floodwait_seconds = secs
+            status_detail = f"Telegram FloodWait: {secs}s; stopped further sends in this pack."
         except Exception as e:
             status = "error"
             status_detail = f"{type(e).__name__}: {e}"
@@ -3026,7 +2995,7 @@ async def send_otp_card(chat_id, zip_id, index):
         f"Phone: `{identity['phone']}`"
     )
     keyboard = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("🔑 Fetch OTP", callback_data=f"otp|{zip_id}|{index}")]]
+        [[styled_button("🔑 Fetch OTP", callback_data=f"otp|{zip_id}|{index}")]]
     )
     await app.send_message(chat_id, text, reply_markup=keyboard)
 
@@ -3086,10 +3055,10 @@ async def show_destroy_confirm(call, zip_id):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("❌ CANCEL (Keep Accounts Safe)", callback_data=f"zip|cancel_destroy|{zip_id}"),
+                styled_button("❌ CANCEL (Keep Accounts Safe)", callback_data=f"zip|cancel_destroy|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("💀 Yes, Permanently Log Out Accounts", callback_data=f"zip|destroy|{zip_id}"),
+                styled_button("💀 Yes, Permanently Log Out Accounts", callback_data=f"zip|destroy|{zip_id}"),
             ]
         ]
     )
@@ -3109,16 +3078,16 @@ async def show_clean_menu(call, zip_id):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("💬 Clear Chats Only", callback_data=f"zip|clean_confirm|{zip_id}|chats"),
+                styled_button("💬 Clear Chats Only", callback_data=f"zip|clean_confirm|{zip_id}|chats"),
             ],
             [
-                InlineKeyboardButton("👤 Clear Contacts Only", callback_data=f"zip|clean_confirm|{zip_id}|contacts"),
+                styled_button("👤 Clear Contacts Only", callback_data=f"zip|clean_confirm|{zip_id}|contacts"),
             ],
             [
-                InlineKeyboardButton("🗑 Clear Everything (Chats + Contacts)", callback_data=f"zip|clean_confirm|{zip_id}|all"),
+                styled_button("🗑 Clear Everything (Chats + Contacts)", callback_data=f"zip|clean_confirm|{zip_id}|all"),
             ],
             [
-                InlineKeyboardButton("🔙 Return", callback_data=f"zip|cancel_clean|{zip_id}"),
+                styled_button("🔙 Return", callback_data=f"zip|cancel_clean|{zip_id}"),
             ],
         ]
     )
@@ -3143,8 +3112,8 @@ async def show_clean_confirm(call, zip_id, mode):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🧹 Yes, Clean", callback_data=f"zip|do_clean|{zip_id}|{mode}"),
-                InlineKeyboardButton("❌ Cancel", callback_data=f"zip|clean_menu|{zip_id}"),
+                styled_button("🧹 Yes, Clean", callback_data=f"zip|do_clean|{zip_id}|{mode}"),
+                styled_button("❌ Cancel", callback_data=f"zip|clean_menu|{zip_id}"),
             ]
         ]
     )
@@ -3730,16 +3699,16 @@ async def show_broadcast_menu(call, zip_id):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("👥 Send in All Groups", callback_data=f"comm|bc_groups|{zip_id}"),
+                styled_button("👥 Send in All Groups", callback_data=f"comm|bc_groups|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("👤 Send in All DMs", callback_data=f"comm|bc_dms|{zip_id}"),
+                styled_button("👤 Send in All DMs", callback_data=f"comm|bc_dms|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("💬 Send in All DMs and Groups", callback_data=f"comm|bc_all|{zip_id}"),
+                styled_button("💬 Send in All DMs and Groups", callback_data=f"comm|bc_all|{zip_id}"),
             ],
             [
-                InlineKeyboardButton("🔙 Return", callback_data=f"zip|comm_menu|{zip_id}"),
+                styled_button("🔙 Return", callback_data=f"zip|comm_menu|{zip_id}"),
             ],
         ]
     )
@@ -5405,8 +5374,8 @@ async def show_delete_avatar_confirm(call, zip_id):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🗑 Confirm Delete", callback_data=f"zip|delete_avatar|{zip_id}"),
-                InlineKeyboardButton("❌ Cancel", callback_data=f"zip|cancel_delete_avatar|{zip_id}"),
+                styled_button("🗑 Confirm Delete", callback_data=f"zip|delete_avatar|{zip_id}"),
+                styled_button("❌ Cancel", callback_data=f"zip|cancel_delete_avatar|{zip_id}"),
             ]
         ]
     )
@@ -5961,7 +5930,7 @@ async def show_pack_info(call, zip_id):
         f"  🔹 Unknown: `{counts['unknown']}`",
     ]
     keyboard = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("🔙 Return", callback_data=f"zip|open|{zip_id}")]]
+        [[styled_button("🔙 Return", callback_data=f"zip|open|{zip_id}")]]
     )
     await safe_edit(call.message, "\n".join(lines), reply_markup=keyboard)
 
@@ -5981,28 +5950,28 @@ async def show_download_menu(call, zip_id):
         f"📱 Total Accounts: `{count}` session(s)\n\n"
         f"Choose an export format optimized for external bots:\n\n"
         f"• 🌐 **Universal Pack (ZIP)**: Complete bundle containing **BOTH** Telethon & Pyrogram `.session` files, `.json` configs & strings. *Guaranteed to work in any bot!*\n"
-        f"• 📲 **Telethon (.session + .json ZIP)**: Pristine SQLite schema for Telethon bots (AccStore, Prime, etc.)\n"
+        f"• 📲 **Telethon (.session + .json ZIP)**: Pristine SQLite schema for Telethon bots (Onyx, Prime, etc.)\n"
         f"• 📲 **Pyrogram (.session + .json ZIP)**: Pristine SQLite schema for Pyrogram, Kurigram & Hydrogram bots\n"
         f"• 📄 **Raw .session File**: Sends uncompressed `.session` directly as a Telegram document so you can forward it to any bot without extracting!\n\n"
         f"✨ *All exports include pristine spec-compliant SQLite databases + full device configs.*"
     )
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🌐 Universal Pack (Telethon + Pyrogram ZIP)", callback_data=f"zip|dl_format|{zip_id}|universal"),
+            styled_button("🌐 Universal Pack (Telethon + Pyrogram ZIP)", callback_data=f"zip|dl_format|{zip_id}|universal"),
         ],
         [
-            InlineKeyboardButton("📲 Telethon (.session + .json)", callback_data=f"zip|dl_format|{zip_id}|telethon"),
-            InlineKeyboardButton("📲 Pyrogram (.session + .json)", callback_data=f"zip|dl_format|{zip_id}|pyrogram"),
+            styled_button("📲 Telethon (.session + .json)", callback_data=f"zip|dl_format|{zip_id}|telethon"),
+            styled_button("📲 Pyrogram (.session + .json)", callback_data=f"zip|dl_format|{zip_id}|pyrogram"),
         ],
         [
-            InlineKeyboardButton("📄 Send Raw Telethon .session", callback_data=f"zip|dl_raw|{zip_id}|telethon"),
-            InlineKeyboardButton("📄 Send Raw Pyrogram .session", callback_data=f"zip|dl_raw|{zip_id}|pyrogram"),
+            styled_button("📄 Send Raw Telethon .session", callback_data=f"zip|dl_raw|{zip_id}|telethon"),
+            styled_button("📄 Send Raw Pyrogram .session", callback_data=f"zip|dl_raw|{zip_id}|pyrogram"),
         ],
         [
-            InlineKeyboardButton(f"⚡ Direct Download ({format_name(current_format).upper()})", callback_data=f"zip|dl_format|{zip_id}|auto"),
+            styled_button(f"⚡ Direct Download ({format_name(current_format).upper()})", callback_data=f"zip|dl_format|{zip_id}|auto"),
         ],
         [
-            InlineKeyboardButton("🔙 Return to Pack Menu", callback_data=f"zip|open|{zip_id}")
+            styled_button("🔙 Return to Pack Menu", callback_data=f"zip|open|{zip_id}")
         ]
     ])
     await safe_edit(call.message, text, reply_markup=keyboard)
@@ -6141,7 +6110,7 @@ async def download_pack(call, zip_id, target_format="universal"):
                 f"📥 **Pack #{zip_id}** [TELETHON]\n"
                 f"✅ Accounts: `{len(files)}`\n"
                 f"📦 Clean SQLite `.session` + matching `.json` configs\n"
-                f"✨ 100% compatible with external Telethon bots (AccStore, Prime, etc.)"
+                f"✨ 100% compatible with external Telethon bots (Onyx, Prime, etc.)"
             )
         elif target_format == "pyrogram":
             caption = (
@@ -6737,10 +6706,10 @@ async def show_export_menu(call, zip_id):
     text = f"📋 **Export Options** — {label} #{zip_id}\nChoose the format for exporting your active session(s):"
     
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📋 Export as String", callback_data=f"zip|export_strings|{zip_id}")],
-        [InlineKeyboardButton("📋 Export as Hex", callback_data=f"zip|export_hex|{zip_id}")],
-        [InlineKeyboardButton("📋 Export Both (String & Hex)", callback_data=f"zip|export_both|{zip_id}")],
-        [InlineKeyboardButton("🔙 Back to Menu", callback_data=f"zip|open|{zip_id}")]
+        [styled_button("📋 Export as String", callback_data=f"zip|export_strings|{zip_id}")],
+        [styled_button("📋 Export as Hex", callback_data=f"zip|export_hex|{zip_id}")],
+        [styled_button("📋 Export Both (String & Hex)", callback_data=f"zip|export_both|{zip_id}")],
+        [styled_button("🔙 Back to Menu", callback_data=f"zip|open|{zip_id}")]
     ])
     await safe_edit(call.message, text, reply_markup=keyboard)
 
@@ -7089,8 +7058,8 @@ async def _render_devices_menu(auth_key, dc_id, input_type, status_msg, otp_text
         device_details = []
         # Add Read OTP and Refresh buttons at the top
         keyboard_buttons.append([
-            InlineKeyboardButton("📩 Read OTP", callback_data="slo|otp"),
-            InlineKeyboardButton("🔄 Refresh", callback_data="slo|refresh")
+            styled_button("📩 Read OTP", callback_data="slo|otp"),
+            styled_button("🔄 Refresh", callback_data="slo|refresh")
         ])
         
         for i, a in enumerate(auths.authorizations, 1):
@@ -7117,13 +7086,13 @@ async def _render_devices_menu(auth_key, dc_id, input_type, status_msg, otp_text
             # Action: either logout self (if current) or revoke specific hash
             action_data = f"slo|self" if is_curr else f"slo|rev|{a.hash}"
             btn_label = f"Logout: {device_name} (Self)" if is_curr else f"Logout: {device_name}"
-            keyboard_buttons.append([InlineKeyboardButton(btn_label, callback_data=action_data)])
+            keyboard_buttons.append([styled_button(btn_label, callback_data=action_data)])
             
         other_devices = [a for a in auths.authorizations if not (getattr(a, "current", False) or getattr(a, "hash", 0) == 0)]
         if other_devices:
-            keyboard_buttons.append([InlineKeyboardButton("💥 Revoke ALL Other Devices", callback_data="slo|others")])
+            keyboard_buttons.append([styled_button("💥 Revoke ALL Other Devices", callback_data="slo|others")])
             
-        keyboard_buttons.append([InlineKeyboardButton("❌ Close", callback_data="slo|cancel")])
+        keyboard_buttons.append([styled_button("❌ Close", callback_data="slo|cancel")])
         
         type_labels = {
             "telethon_string": "Telethon String",
@@ -7269,7 +7238,7 @@ async def render_direct_devices(zip_id):
             dev_model = item.device_model or "Unknown"
             ip = getattr(item, "ip", "") or "Unknown IP"
             keyboard_rows.append([
-                InlineKeyboardButton(
+                styled_button(
                     f"🗑 Terminate: {dev_model} ({ip})",
                     callback_data=f"term_dev|{zip_id}|{item.hash}"
                 )
@@ -7277,24 +7246,24 @@ async def render_direct_devices(zip_id):
             
         # Refresh and Read OTP buttons
         keyboard_rows.append([
-            InlineKeyboardButton("🔄 Refresh Devices", callback_data=f"refresh_dev|{zip_id}"),
-            InlineKeyboardButton("🔑 Read OTP", callback_data=f"direct_otp|{zip_id}")
+            styled_button("🔄 Refresh Devices", callback_data=f"refresh_dev|{zip_id}"),
+            styled_button("🔑 Read OTP", callback_data=f"direct_otp|{zip_id}")
         ])
         
         # Terminate Bot Connection (Self Logout) button
         keyboard_rows.append([
-            InlineKeyboardButton("💀 Terminate Bot Connection", callback_data=f"term_self|{zip_id}")
+            styled_button("💀 Terminate Bot Connection", callback_data=f"term_self|{zip_id}")
         ])
         
         # Revoke ALL Other Devices button
         if other_devices:
             keyboard_rows.append([
-                InlineKeyboardButton("💥 Revoke ALL Other Devices", callback_data=f"term_all_dev|{zip_id}")
+                styled_button("💥 Revoke ALL Other Devices", callback_data=f"term_all_dev|{zip_id}")
             ])
         
         # Add Link to the Full Operations Menu
         keyboard_rows.append([
-            InlineKeyboardButton("🛠 Full Operations Menu", callback_data=f"zip|open|{zip_id}")
+            styled_button("🛠 Full Operations Menu", callback_data=f"zip|open|{zip_id}")
         ])
         
         markup = InlineKeyboardMarkup(keyboard_rows)

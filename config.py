@@ -1,10 +1,10 @@
 # ==============================================================================
-# AccStore Session Manager — Configuration, Constants, State & Foundation
+# Onyx Session Manager — Configuration, Constants, State & Foundation
 # ==============================================================================
 
 """
 ╔═══════════════════════════════════════════════════════════════╗
-║         AccStore — Session Management Platform         ║
+║         Onyx — Session Management Platform         ║
 ╚═══════════════════════════════════════════════════════════════╝
 
   Upload .session packs and run powerful operations on them.
@@ -145,7 +145,7 @@ except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
 # --- Pyrogram: One of the two "remote controls" for talking to Telegram ---
-from pyrogram import Client, filters, StopPropagation
+from pyrogram import Client, filters, StopPropagation, enums
 from pyrogram.enums import ChatType
 from pyrogram.errors import (
     AuthKeyDuplicated,       # The login key was used somewhere else
@@ -166,6 +166,7 @@ from pyrogram.errors import (
     PhoneCodeInvalid,
     PhoneCodeExpired,
     SessionRevoked,
+    UserNotParticipant,
 )
 from pyrogram.raw.functions.channels import LeaveChannel    # Leave a group/channel
 from pyrogram.raw.functions.messages import DeleteHistory   # Delete chat history
@@ -176,6 +177,18 @@ try:
 except ImportError:
     from pyrogram.storage import SQLiteStorage as _SessionStorage  # Kurigram fork
 from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup  # Button menus
+
+_PRIMARY = enums.ButtonStyle.PRIMARY
+_DANGER = enums.ButtonStyle.DANGER
+
+
+def styled_button(text, *args, **kwargs):
+    """Build consistent, touch-friendly inline buttons with semantic danger styling."""
+    label = str(text).casefold()
+    danger_terms = ("logout", "log out", "clear", "delete", "cancel", "remove", "terminate", "revoke", "destroy", "abort", "stop", "ban", "reset")
+    kwargs.setdefault("style", _DANGER if any(term in label for term in danger_terms) else _PRIMARY)
+    return InlineKeyboardButton(text, *args, **kwargs)
+
 
 # --- Telethon: The second "remote control" for talking to Telegram ---
 from telethon.errors import (
@@ -490,7 +503,7 @@ if not BOT_TOKEN:
 # ─────────────────────────────────────────────────────────────────────────────
 # Platform Customization
 # ─────────────────────────────────────────────────────────────────────────────
-PLATFORM_NAME = os.getenv("PLATFORM_NAME", "AccStore Session Manager")
+PLATFORM_NAME = os.getenv("PLATFORM_NAME", "Onyx Session Manager")
 # Ultra-Safe Anti-Freeze / Anti-Revoke concurrency policy:
 # Never hammer Telegram with high concurrent connections from a single IP.
 # Strictly satisfies: "if process slow then no worry but accounts must not freeze or revoke".
@@ -503,6 +516,8 @@ SKIP_SPAMBOT = os.getenv("SKIP_SPAMBOT", "False").lower() == "true"
 # Global connection limiter to prevent IP flagging across all 500+ users
 GLOBAL_MAX_CONNECTIONS = max(25, int(os.getenv("GLOBAL_MAX_CONNECTIONS", "25")))
 GLOBAL_CONNECTION_SEM = asyncio.Semaphore(GLOBAL_MAX_CONNECTIONS)
+# Bound concurrent email-binding flows across users to keep Telegram RPCs below flood thresholds.
+MAIL_BIND_SEMAPHORE = asyncio.Semaphore(2)
 
 # External links (displayed on the main /start menu if set)
 def _clean_url(url):
@@ -814,7 +829,11 @@ BOT_START_TIME = time.time()  # Tracks when the bot was started
 from collections import deque
 ADMIN_ACTIVITY_LOG = deque(maxlen=50)  # Rolling log of admin actions
 WHITELIST_MODE = False  # If True, only whitelisted users can use the bot
-WHITELISTED_USERS = set()  # Set of user IDs allowed when whitelist mode is active
+WHITELISTED_USERS = set()  # Persisted IDs allowed when whitelist mode is active
+ACCESS_MODE = "free"  # free = public; paid = admins and unexpired sudo grants only
+SUDO_USERS = {}  # user_id string -> Unix expiry timestamp
+BANNED_USERS = set()
+FORCE_JOIN_CHATS = {}
 MAINTENANCE_MODE = False
 GLOBAL_ANNOUNCEMENT = ''
 BROADCAST_STATE = {}
@@ -906,6 +925,24 @@ def is_admin(user_id):
     if not ADMIN_IDS:
         return False
     return user_id in ADMIN_IDS
+
+
+def sudo_expiry(user_id):
+    """Return the sudo expiry timestamp, supporting old dict-shaped registry entries."""
+    entry = SUDO_USERS.get(str(user_id))
+    if isinstance(entry, dict):
+        entry = entry.get("expires_at")
+    try:
+        return float(entry)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def has_access(user_id, now=None):
+    """Return whether a user may use the bot under the selected accessibility mode."""
+    if ACCESS_MODE != "paid" or is_admin(user_id):
+        return True
+    return sudo_expiry(user_id) > (time.time() if now is None else now)
 
 
 
@@ -1002,7 +1039,8 @@ def zip_belongs_to_user(zip_id, user_id):
         return True
     owner = record.get("owner_id")
     if owner is None:
-        return True
+        # Legacy packs without an owner must not become public session repositories.
+        return False
     return str(owner) == str(user_id)
 
 
