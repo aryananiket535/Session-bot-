@@ -12,6 +12,7 @@ import tempfile
 import time
 import unittest
 
+import config
 import mail_engine
 import session_core
 import operations
@@ -162,8 +163,8 @@ def test_keyboards_and_ui():
     assert "mailbind|back|10" in bind_data
     
     bind_kb_no_self = session_core.mail_binding_keyboard(10, has_self_mail=False)
-    bind_no_self_labels = [btn.text for row in bind_kb_no_self.inline_keyboard for btn in row]
-    assert "📧 Self-Mail (Setup First)" in bind_no_self_labels
+    bind_no_self_buttons = [btn for row in bind_kb_no_self.inline_keyboard for btn in row]
+    assert any(btn.text == "Self-Mail (Setup First)" and btn.icon_custom_emoji_id == config.CUSTOM_BUTTON_EMOJI_IDS["📧"] for btn in bind_no_self_buttons)
     print(" -> mail_binding_keyboard routes (temp, self, setup, back): OK")
     
     # mail_settings_keyboard

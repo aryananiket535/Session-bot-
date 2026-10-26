@@ -894,7 +894,7 @@ async def admin_packs_callback(_, call: CallbackQuery):
     pack_list = [(zid, z) for zid, z in zips.items()]
     pack_list.sort(key=lambda x: int(x[0]), reverse=True)
 
-    per_page = 8
+    per_page = 10
     total = len(pack_list)
     total_pages = max(1, (total + per_page - 1) // per_page)
     page = min(page, total_pages - 1)
@@ -2005,7 +2005,7 @@ async def user_packs_callback(_, call: CallbackQuery):
             reply_markup=keyboard
         )
     
-    per_page = 6
+    per_page = 10
     total = len(user_zips)
     total_pages = max(1, (total + per_page - 1) // per_page)
     page = max(0, min(page, total_pages - 1))
@@ -2014,8 +2014,9 @@ async def user_packs_callback(_, call: CallbackQuery):
     keyboard_rows = []
     for zid, z in chunk:
         name = z.get("name") or f"Pack {zid}"
+        short_name = name if len(name) <= 28 else name[:25].rstrip() + "…"
         cnt = len(get_session_files(zid))
-        keyboard_rows.append([styled_button(f"📂 #{zid} {name} ({cnt} sessions)", callback_data=f"zip|open|{zid}")])
+        keyboard_rows.append([styled_button(f"📂 #{zid} {short_name} · {cnt} sessions", callback_data=f"zip|open|{zid}")])
     
     nav = []
     if page > 0:

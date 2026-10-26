@@ -181,12 +181,63 @@ from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMa
 _PRIMARY = enums.ButtonStyle.PRIMARY
 _DANGER = enums.ButtonStyle.DANGER
 
+# Telegram custom emoji IDs supplied for this bot's inline-button icons.
+# Kurigram's InlineKeyboardButton supports icon_custom_emoji_id; plain Bot API
+# clients may ignore these icons and display the text label normally.
+CUSTOM_BUTTON_EMOJI_IDS = {
+    "🔑": "6176966310920983412",
+    "🔐": "5197288647275071607",
+    "📅": "5251537301154062376",
+    "🚫": "5400336550498157996",
+    "📧": "5913236481220022288",
+    "✉️": "5285184156555306745",
+    "🌟": "6123040393769521180",
+    "🌎": "5776233299424843260",
+    "🌐": "6114021507908767611",
+    "👁️": "6222116634929140568",
+    "🧹": "5305393940483025545",
+    "🪪": "5445353829304387411",
+    "📝": "5837003105228558796",
+    "👤": "5316887736823591263",
+    "🖼️": "542918766259",
+    "🗑️": "5307659638810877853",
+    "💀": "5220037761897085778",
+    "🤖": "5931614414351372818",
+    "💻": "5819127949558812112",
+    "🆕": "6271473763439612077",
+    "✏️": "5956143844457189176",
+    "✂️": "5391199480022309848",
+    "🔗": "5305329417189340362",
+    "🔃": "5870892901159932239",
+    "📊": "615465796731",
+    "📥": "5443127283898405358",
+    "➕": "5397916757333654639",
+    "🛑": "6084515769780013003",
+    "ℹ️": "5452026937172048380",
+    "🔧": "5309878852707701235",
+    "🏓": "5269563867305879894",
+    "📂": "6096080291347042802",
+    "⚠️": "5039665997506675838",
+    "⌛": "5451646226975955576",
+    "⏰": "5787488119490088755",
+}
+
 
 def styled_button(text, *args, **kwargs):
-    """Build consistent, touch-friendly inline buttons with semantic danger styling."""
-    label = str(text).casefold()
+    """Build a premium inline button with semantic color and custom emoji icon."""
+    text = str(text)
+    label = text.casefold()
     danger_terms = ("logout", "log out", "clear", "delete", "cancel", "remove", "terminate", "revoke", "destroy", "abort", "stop", "ban", "reset")
     kwargs.setdefault("style", _DANGER if any(term in label for term in danger_terms) else _PRIMARY)
+
+    # Move a recognized leading emoji into Telegram's dedicated custom icon field
+    # to avoid showing the regular emoji beside the premium button icon.
+    if "icon_custom_emoji_id" not in kwargs:
+        for fallback, emoji_id in sorted(CUSTOM_BUTTON_EMOJI_IDS.items(), key=lambda item: len(item[0]), reverse=True):
+            if text.startswith(fallback):
+                kwargs["icon_custom_emoji_id"] = emoji_id
+                text = text[len(fallback):].lstrip()
+                break
     return InlineKeyboardButton(text, *args, **kwargs)
 
 

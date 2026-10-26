@@ -4,6 +4,7 @@ os.environ.setdefault("API_HASH", "0123456789abcdef0123456789abcdef")
 os.environ.setdefault("BOT_TOKEN", "12345:abcdefghijklmnopqrstuvwxyz0123456789abcdef")
 
 import tempfile
+import time
 import unittest
 import zipfile
 from types import SimpleNamespace
@@ -11,6 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import config
 import handlers
+import operations
 import session_core
 
 
@@ -29,10 +31,13 @@ class TestAuditRegressions(unittest.TestCase):
              patch.object(config, "is_admin", return_value=True):
             self.assertTrue(config.zip_belongs_to_user(41, 100))
 
-    def test_button_semantic_styles(self):
+    def test_button_semantic_styles_and_custom_emoji_icons(self):
         self.assertEqual(config.styled_button("Open Pack", callback_data="open").style, config._PRIMARY)
         for label in ("Logout", "Clear Cache", "Delete Pack", "Cancel", "Revoke Device"):
             self.assertEqual(config.styled_button(label, callback_data="x").style, config._DANGER)
+        premium = config.styled_button("📂 My Packs", callback_data="packs")
+        self.assertEqual(premium.icon_custom_emoji_id, config.CUSTOM_BUTTON_EMOJI_IDS["📂"])
+        self.assertEqual(premium.text, "My Packs")
 
 
     def test_sudo_duration_and_expiry(self):
@@ -88,6 +93,20 @@ class TestPaidAccessMiddleware(unittest.IsolatedAsyncioTestCase):
             msg.reply_text.assert_awaited_once()
         finally:
             config.ACCESS_MODE, config.WHITELIST_MODE = old_mode, old_whitelist
+
+
+class TestMailBindCooldown(unittest.IsolatedAsyncioTestCase):
+    async def test_active_shared_cooldown_skips_telegram_send(self):
+        old_until = operations._MAIL_BIND_COOLDOWN_UNTIL
+        operations._MAIL_BIND_COOLDOWN_UNTIL = time.time() + 30
+        send = AsyncMock()
+        try:
+            with patch.object(operations, "load_meta", return_value={"telegram_mail_bind_cooldown_until": 0}):
+                with self.assertRaises(operations.MailBindCooldownError):
+                    await operations.guarded_send_email_code(send, mode="temp")
+            send.assert_not_awaited()
+        finally:
+            operations._MAIL_BIND_COOLDOWN_UNTIL = old_until
 
 
 class TestForceJoinStatus(unittest.IsolatedAsyncioTestCase):

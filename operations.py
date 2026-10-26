@@ -12,6 +12,78 @@ for _m in (config, session_core):
         if not _k.startswith("__"):
             globals()[_k] = _v
 
+
+_MAIL_BIND_SEND_LOCK = asyncio.Lock()
+_MAIL_BIND_LAST_SEND_AT = 0.0
+_MAIL_BIND_COOLDOWN_UNTIL = 0.0
+
+
+class MailBindCooldownError(RuntimeError):
+    """Raised locally when a shared Telegram email-send cooldown is active."""
+
+    def __init__(self, seconds):
+        self.seconds = max(1, int(float(seconds) + 0.999))
+        super().__init__(f"Telegram email-send cooldown active for {self.seconds}s")
+
+
+def _saved_mail_bind_cooldown_until():
+    try:
+        return float(load_meta().get("telegram_mail_bind_cooldown_until", 0) or 0)
+    except Exception:
+        return 0.0
+
+
+def _record_mail_bind_cooldown(seconds):
+    global _MAIL_BIND_COOLDOWN_UNTIL
+    until = time.time() + max(1, int(seconds))
+    _MAIL_BIND_COOLDOWN_UNTIL = max(_MAIL_BIND_COOLDOWN_UNTIL, until)
+    try:
+        meta = load_meta()
+        meta["telegram_mail_bind_cooldown_until"] = max(
+            float(meta.get("telegram_mail_bind_cooldown_until", 0) or 0),
+            _MAIL_BIND_COOLDOWN_UNTIL,
+        )
+        save_meta(meta)
+    except Exception as exc:
+        logging.warning(f"[MAIL_BIND] Could not persist Telegram cooldown: {exc}")
+
+
+async def guarded_send_email_code(send_request, mode="temp"):
+    """Serialize verification-code sends and coordinate Telegram FloodWait across packs."""
+    global _MAIL_BIND_LAST_SEND_AT, _MAIL_BIND_COOLDOWN_UNTIL
+    async with _MAIL_BIND_SEND_LOCK:
+        _MAIL_BIND_COOLDOWN_UNTIL = max(
+            _MAIL_BIND_COOLDOWN_UNTIL, _saved_mail_bind_cooldown_until()
+        )
+        remaining = _MAIL_BIND_COOLDOWN_UNTIL - time.time()
+        if remaining > 0:
+            raise MailBindCooldownError(remaining)
+
+        # Temp inbox polling is often much faster than IMAP, so enforce a larger
+        # minimum gap before asking Telegram to send another verification code.
+        min_gap = 45.0 if mode == "temp" else 15.0
+        gap_remaining = min_gap - (time.monotonic() - _MAIL_BIND_LAST_SEND_AT)
+        if gap_remaining > 0:
+            await asyncio.sleep(gap_remaining)
+
+        # Re-check persisted state after waiting, in case another worker recorded a FloodWait.
+        _MAIL_BIND_COOLDOWN_UNTIL = max(
+            _MAIL_BIND_COOLDOWN_UNTIL, _saved_mail_bind_cooldown_until()
+        )
+        remaining = _MAIL_BIND_COOLDOWN_UNTIL - time.time()
+        if remaining > 0:
+            raise MailBindCooldownError(remaining)
+
+        try:
+            return await send_request()
+        except (FloodWait, FloodWaitError) as exc:
+            seconds = max(1, int(getattr(exc, "value", getattr(exc, "seconds", 1))))
+            _record_mail_bind_cooldown(seconds)
+            raise
+        finally:
+            _MAIL_BIND_LAST_SEND_AT = time.monotonic()
+
+
 def creation_dir(user_id):
     return os.path.join(ROOT_DIR, "generated", str(user_id))
 
@@ -1864,17 +1936,26 @@ async def run_bind_email(call, zip_id, mode="self"):
                             retry_domain = False
 
                             try:
-                                sent_code = await client.invoke(pyro_functions.account.SendVerifyEmailCode(
-                                    purpose=pyro_types.EmailVerifyPurposeLoginChange(),
-                                    email=target_email
-                                ))
+                                sent_code = await guarded_send_email_code(
+                                    lambda: client.invoke(pyro_functions.account.SendVerifyEmailCode(
+                                        purpose=pyro_types.EmailVerifyPurposeLoginChange(),
+                                        email=target_email
+                                    )),
+                                    mode=mode,
+                                )
                                 send_ok = True
+                            except MailBindCooldownError as cooldown:
+                                batch_floodwait_seconds = cooldown.seconds
+                                status = "rate_limited"
+                                status_detail = f"Shared Telegram email-send cooldown ({cooldown.seconds}s); stopped further sends in this pack."
+                                await progress.update(0, f"⏳ Telegram email-send cooldown active ({cooldown.seconds}s); stopping this batch safely.")
+                                break
                             except FloodWait as fw:
                                 # FloodWait is account/server-side; rotating the IP won't clear it.
                                 # Do not open a second client on the same session or use it after close.
                                 batch_floodwait_seconds = max(1, int(getattr(fw, "value", 1)))
                                 status = "rate_limited"
-                                status_detail = f"Telegram FloodWait: {batch_floodwait_seconds}s; stopped further sends in this pack."
+                                status_detail = f"Telegram email-verification FloodWait: {batch_floodwait_seconds}s; stopped further sends in this pack. Temp-mail provider did not issue this Telegram wait; retry after the indicated cooldown."
                                 await progress.update(0, f"⏳ +{phone}: Telegram asked us to pause for {batch_floodwait_seconds}s; stopping this batch safely.")
                                 break
                             except Exception as send_err:
@@ -2023,16 +2104,25 @@ async def run_bind_email(call, zip_id, mode="self"):
                                 retry_domain = False
 
                                 try:
-                                    sent_code = await client(tele_functions.account.SendVerifyEmailCodeRequest(
-                                        purpose=tele_types.EmailVerifyPurposeLoginChange(),
-                                        email=target_email
-                                    ))
+                                    sent_code = await guarded_send_email_code(
+                                        lambda: client(tele_functions.account.SendVerifyEmailCodeRequest(
+                                            purpose=tele_types.EmailVerifyPurposeLoginChange(),
+                                            email=target_email
+                                        )),
+                                        mode=mode,
+                                    )
                                     send_ok = True
+                                except MailBindCooldownError as cooldown:
+                                    batch_floodwait_seconds = cooldown.seconds
+                                    status = "rate_limited"
+                                    status_detail = f"Shared Telegram email-send cooldown ({cooldown.seconds}s); stopped further sends in this pack."
+                                    await progress.update(0, f"⏳ Telegram email-send cooldown active ({cooldown.seconds}s); stopping this batch safely.")
+                                    break
                                 except FloodWaitError as fw:
                                     # Respect Telegram's server-provided wait; IP rotation cannot bypass account limits.
                                     batch_floodwait_seconds = max(1, int(getattr(fw, "seconds", 1)))
                                     status = "rate_limited"
-                                    status_detail = f"Telegram FloodWait: {batch_floodwait_seconds}s; stopped further sends in this pack."
+                                    status_detail = f"Telegram email-verification FloodWait: {batch_floodwait_seconds}s; stopped further sends in this pack. Temp-mail provider did not issue this Telegram wait; retry after the indicated cooldown."
                                     await progress.update(0, f"⏳ +{phone}: Telegram asked us to pause for {batch_floodwait_seconds}s; stopping this batch safely.")
                                     break
                                 except Exception as send_err:
@@ -2130,7 +2220,7 @@ async def run_bind_email(call, zip_id, mode="self"):
             status = "rate_limited"
             secs = max(1, int(getattr(fw, "value", getattr(fw, "seconds", 1))))
             batch_floodwait_seconds = secs
-            status_detail = f"Telegram FloodWait: {secs}s; stopped further sends in this pack."
+            status_detail = f"Telegram email-verification FloodWait: {secs}s; stopped further sends in this pack. Retry after the indicated cooldown."
         except Exception as e:
             status = "error"
             status_detail = f"{type(e).__name__}: {e}"
